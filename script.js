@@ -7,3 +7,13 @@ app.innerHTML = `
 `;
 console.log("DC ONE carregou ✅");
 
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", async () => {
+    try {
+      const reg = await navigator.serviceWorker.register("./sw.js");
+      console.log("SW registado:", reg.scope);
+    } catch (e) {
+      console.warn("SW falhou:", e);
+    }
+  });
+}
