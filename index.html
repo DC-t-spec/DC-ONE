@@ -4,20 +4,314 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>DC ONE</title>
-
-  <link rel="stylesheet" href="./styles.css" />
-  <link rel="manifest" href="./manifest.webmanifest" />
-  <meta name="theme-color" content="#111111" />
+  <link rel="stylesheet" href="css/app.css" />
 </head>
-<body>
-  <div id="app"></div>
 
-  <script defer src="./script.js"></script>
-  <script>
-    if ("serviceWorker" in navigator) {
-      window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js"));
-    }
-  </script>
+<body>
+  <!-- APP SHELL -->
+  <div id="appShell">
+
+    <!-- 1) TELA DE BLOQUEIO / LOGIN -->
+    <section id="screen-lock" class="screen screen--active">
+      <div class="auth">
+        <div class="auth__card card">
+          <div class="brand">
+            <div class="brand__logo">DC</div>
+            <div class="brand__text">
+              <div class="brand__name">DC ONE</div>
+              <div class="brand__tag">ERP • DSS • Multi-vertical</div>
+            </div>
+          </div>
+
+          <h1 class="title">Entrar</h1>
+          <p class="muted">Use o ID da empresa + utilizador + palavra-passe.</p>
+
+          <form id="formLogin" class="form">
+            <div class="field">
+              <label for="loginCompanyId">ID da Empresa</label>
+              <input id="loginCompanyId" name="companyId" type="text" placeholder="Ex.: DC-000123" autocomplete="off" required />
+            </div>
+
+            <div class="field">
+              <label for="loginUser">Utilizador</label>
+              <input id="loginUser" name="user" type="text" placeholder="Ex.: admin" autocomplete="username" required />
+            </div>
+
+            <div class="field">
+              <label for="loginPass">Palavra-passe</label>
+              <input id="loginPass" name="pass" type="password" placeholder="••••••••" autocomplete="current-password" required />
+            </div>
+
+            <div class="row row--gap">
+              <button class="btn btn--primary" type="submit">Entrar</button>
+              <button id="btnGoCreateCompany" class="btn btn--ghost" type="button">Criar Empresa</button>
+            </div>
+
+            <div class="note">
+              <span class="pill pill--blue">Basic</span>
+              <span class="pill pill--green">Pro</span>
+              <span class="pill pill--orange">Inteligente</span>
+            </div>
+          </form>
+        </div>
+
+        <div class="auth__aside">
+          <div class="aside card">
+            <h2 class="subtitle">Planos DC ONE</h2>
+            <ul class="list">
+              <li><b>Basic:</b> controlo (vendas, stock, caixa, clientes)</li>
+              <li><b>Pro:</b> análises (KPIs, relatórios, tendências)</li>
+              <li><b>Inteligente:</b> DSS/ML (recomendações e decisão)</li>
+            </ul>
+            <div class="divider"></div>
+            <p class="muted small">
+              Multi-vertical: mercearia, bottle store, farmácia, restaurante, hotel, clínica, agricultura, avicultura, incubadora, etc.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- 2) ONBOARDING / CRIAR EMPRESA -->
+    <section id="screen-onboard" class="screen">
+      <div class="container">
+        <header class="topbar card">
+          <div class="topbar__left">
+            <div class="brand brand--small">
+              <div class="brand__logo">DC</div>
+              <div class="brand__text">
+                <div class="brand__name">DC ONE</div>
+                <div class="brand__tag">Criar Empresa</div>
+              </div>
+            </div>
+          </div>
+          <div class="topbar__right">
+            <button id="btnBackToLogin" class="btn btn--ghost" type="button">Voltar</button>
+          </div>
+        </header>
+
+        <div class="grid grid--2">
+          <!-- Dados da Empresa -->
+          <div class="card">
+            <h2 class="subtitle">Dados da Empresa</h2>
+            <form id="formCreateCompany" class="form">
+
+              <div class="grid grid--2">
+                <div class="field">
+                  <label for="cName">Nome da Empresa</label>
+                  <input id="cName" name="name" type="text" placeholder="Ex.: JENI Empreendimentos" required />
+                </div>
+                <div class="field">
+                  <label for="cBranch">Ramo / Template</label>
+                  <select id="cBranch" name="branch" required>
+                    <option value="">Selecione...</option>
+                    <option>Mercearia</option>
+                    <option>Bottle Store</option>
+                    <option>Farmácia</option>
+                    <option>Restaurante</option>
+                    <option>Pastelaria / Café</option>
+                    <option>Hotel</option>
+                    <option>Guest House</option>
+                    <option>Armazém e Distribuição</option>
+                    <option>Oficina</option>
+                    <option>Salão</option>
+                    <option>Clínica</option>
+                    <option>Avicultura</option>
+                    <option>Agricultura</option>
+                    <option>Incubadora (salas/estúdios/co-work)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="grid grid--2">
+                <div class="field">
+                  <label for="cNuit">NUIT</label>
+                  <input id="cNuit" name="nuit" type="text" placeholder="Ex.: 123456789" />
+                </div>
+                <div class="field">
+                  <label for="cEmail">Email</label>
+                  <input id="cEmail" name="email" type="email" placeholder="ex.: empresa@email.com" />
+                </div>
+              </div>
+
+              <div class="grid grid--2">
+                <div class="field">
+                  <label for="cPhone">Telefone</label>
+                  <input id="cPhone" name="phone" type="tel" placeholder="Ex.: +258 ..." />
+                </div>
+                <div class="field">
+                  <label for="cAddress">Endereço</label>
+                  <input id="cAddress" name="address" type="text" placeholder="Rua, nº, bairro, cidade" />
+                </div>
+              </div>
+
+              <div class="grid grid--2">
+                <div class="field">
+                  <label for="cCity">Cidade</label>
+                  <input id="cCity" name="city" type="text" placeholder="Maputo" />
+                </div>
+                <div class="field">
+                  <label for="cCountry">País</label>
+                  <input id="cCountry" name="country" type="text" placeholder="Moçambique" />
+                </div>
+              </div>
+
+              <div class="divider"></div>
+
+              <h3 class="subtitle subtitle--sm">Plano</h3>
+              <div class="segmented" role="group" aria-label="Plano">
+                <label class="segmented__item">
+                  <input type="radio" name="plan" value="basic" checked />
+                  <span>Basic</span>
+                </label>
+                <label class="segmented__item">
+                  <input type="radio" name="plan" value="pro" />
+                  <span>Pro</span>
+                </label>
+                <label class="segmented__item">
+                  <input type="radio" name="plan" value="inteligente" />
+                  <span>Inteligente</span>
+                </label>
+              </div>
+
+              <div class="row row--gap row--end">
+                <button class="btn btn--primary" type="submit">Criar Empresa</button>
+              </div>
+
+            </form>
+          </div>
+
+          <!-- Admin -->
+          <div class="card">
+            <h2 class="subtitle">Criar Utilizador Admin</h2>
+
+            <div class="form">
+              <div class="field">
+                <label for="aFullName">Nome completo</label>
+                <input id="aFullName" name="adminFullName" type="text" placeholder="Ex.: Júlia Novela" />
+              </div>
+
+              <div class="grid grid--2">
+                <div class="field">
+                  <label for="aUser">Utilizador</label>
+                  <input id="aUser" name="adminUser" type="text" placeholder="admin" />
+                </div>
+                <div class="field">
+                  <label for="aRole">Perfil</label>
+                  <input id="aRole" type="text" value="Admin" disabled />
+                </div>
+              </div>
+
+              <div class="field">
+                <label for="aPass">Palavra-passe</label>
+                <input id="aPass" name="adminPass" type="password" placeholder="Crie uma palavra-passe forte" />
+              </div>
+
+              <div class="field">
+                <label for="aPass2">Confirmar palavra-passe</label>
+                <input id="aPass2" name="adminPass2" type="password" placeholder="Repita a palavra-passe" />
+              </div>
+
+              <div class="divider"></div>
+
+              <h3 class="subtitle subtitle--sm">Pré-visualização (vai ser do template escolhido)</h3>
+              <div class="preview">
+                <div class="preview__box">
+                  <div class="preview__title">Template: <span id="previewBranch">—</span></div>
+                  <div class="preview__muted">O menu e módulos vão ajustar ao ramo.</div>
+                </div>
+              </div>
+
+              <p class="muted small">
+                Após criar, o sistema gera um <b>ID da Empresa</b> para login e configura a base inicial.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- 3) APP PRINCIPAL (ERP) -->
+    <section id="screen-app" class="screen">
+      <div class="layout">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+          <div class="sidebar__brand">
+            <div class="brand brand--small">
+              <div class="brand__logo">DC</div>
+              <div class="brand__text">
+                <div class="brand__name">DC ONE</div>
+                <div class="brand__tag" id="companyLabel">Empresa</div>
+              </div>
+            </div>
+          </div>
+
+          <nav class="nav">
+            <button class="nav__item nav__item--active" data-route="dashboard">Dashboard</button>
+            <button class="nav__item" data-route="sales">Vendas</button>
+            <button class="nav__item" data-route="stock">Stock</button>
+            <button class="nav__item" data-route="cash">Caixa</button>
+            <button class="nav__item" data-route="clients">Clientes</button>
+            <button class="nav__item" data-route="suppliers">Fornecedores</button>
+            <button class="nav__item" data-route="reports">Relatórios</button>
+            <button class="nav__item" data-route="settings">Configurações</button>
+
+            <div class="nav__section">
+              <div class="nav__sectionTitle">Plano</div>
+              <div class="chips">
+                <span id="planChip" class="pill pill--blue">Basic</span>
+              </div>
+            </div>
+          </nav>
+
+          <div class="sidebar__footer">
+            <button id="btnLogout" class="btn btn--danger btn--block">Sair</button>
+          </div>
+        </aside>
+
+        <!-- Main -->
+        <main class="main">
+          <header class="header card">
+            <div class="header__left">
+              <h1 id="pageTitle" class="pageTitle">Dashboard</h1>
+              <p class="muted small" id="pageSubtitle">Visão geral do negócio</p>
+            </div>
+            <div class="header__right">
+              <div class="userBadge">
+                <div class="userBadge__dot"></div>
+                <div>
+                  <div id="userName" class="userBadge__name">Utilizador</div>
+                  <div id="userRole" class="userBadge__role">Perfil</div>
+                </div>
+              </div>
+            </div>
+          </header>
+
+          <section id="content" class="content">
+            <!-- Conteúdo carregado pela UI.js -->
+            <div class="card">
+              <h2 class="subtitle">Bem-vinda(o) ao DC ONE</h2>
+              <p class="muted">O conteúdo do módulo selecionado aparece aqui.</p>
+            </div>
+          </section>
+        </main>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- JS -->
+  <script src="js/1-config.js"></script>
+  <script src="js/2-state-db.js"></script>
+  <script src="js/3-helpers.js"></script>
+  <script src="js/4-db-load-save.js"></script>
+  <script src="js/5-logic.js"></script>
+  <script src="js/6-ui.js"></script>
+  <script src="js/7-events.js"></script>
+  <script src="js/8-init.js"></script>
+  <script src="js/app.js"></script>
 </body>
 </html>
 
