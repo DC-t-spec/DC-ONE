@@ -885,3 +885,6 @@ window.addEventListener("DOMContentLoaded", () => {
 
 // expõe (opcional) para debug
 window.DC_ONE = { DC_CONFIG, DC_STATE, DC_HELPERS, DC_DB, DC_LOGIC, DC_UI };
+   
+   })(); // <-- FECHA a IIFE iniciada lá em cima
+
