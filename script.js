@@ -156,6 +156,92 @@
 
     return { $, $$, sanitize, slug, generateCompanyCode, makeAuthEmail, pickModulesForBranch, toast };
   })();
+function showCompanyIdModal(companyId) {
+  // remove modal anterior se existir
+  const old = document.getElementById("dcCompanyIdModal");
+  if (old) old.remove();
+
+  const overlay = document.createElement("div");
+  overlay.id = "dcCompanyIdModal";
+  overlay.style.cssText = `
+    position:fixed;inset:0;background:rgba(0,0,0,.55);
+    display:flex;align-items:center;justify-content:center;
+    z-index:999999;padding:18px;
+  `;
+
+  const box = document.createElement("div");
+  box.style.cssText = `
+    width:min(520px, 100%); background:#fff; border-radius:18px;
+    padding:18px 18px 14px; box-shadow:0 20px 60px rgba(0,0,0,.25);
+    border:1px solid rgba(0,0,0,.08);
+  `;
+
+  box.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+      <div style="font-weight:900;font-size:18px">✅ Empresa criada</div>
+      <button id="dcCloseCompanyId" style="
+        border:none;background:transparent;font-size:18px;font-weight:900;cursor:pointer
+      ">✕</button>
+    </div>
+
+    <p style="margin:10px 0 10px;color:#334155;font-weight:700">
+      Guarda este <b>ID da Empresa</b> (vais usar sempre para entrar):
+    </p>
+
+    <div style="
+      font-size:28px;font-weight:950;letter-spacing:1px;
+      padding:14px;border-radius:14px;background:#f1f5f9;border:1px solid rgba(0,0,0,.08);
+      text-align:center;
+    " id="dcCompanyIdText">${companyId}</div>
+
+    <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap">
+      <button id="dcCopyCompanyId" style="
+        flex:1;min-width:180px;padding:12px 14px;border-radius:14px;
+        border:1px solid rgba(0,0,0,.12); background:#0ea5e9;color:#fff;font-weight:900;cursor:pointer
+      ">Copiar ID</button>
+
+      <button id="dcGoLogin" style="
+        flex:1;min-width:180px;padding:12px 14px;border-radius:14px;
+        border:1px solid rgba(0,0,0,.12); background:#16a34a;color:#fff;font-weight:900;cursor:pointer
+      ">Ir para Login</button>
+    </div>
+
+    <p style="margin:10px 0 0;color:#64748b;font-weight:700;font-size:12px">
+      Último ID guardado neste dispositivo: <span style="font-weight:900">${localStorage.getItem("DC_ONE_LAST_COMPANY_ID") || companyId}</span>
+    </p>
+  `;
+
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+
+  const close = () => overlay.remove();
+
+  document.getElementById("dcCloseCompanyId")?.addEventListener("click", close);
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
+
+  document.getElementById("dcCopyCompanyId")?.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(companyId);
+      // feedback rápido
+      const btn = document.getElementById("dcCopyCompanyId");
+      if (btn) {
+        const oldText = btn.textContent;
+        btn.textContent = "✅ Copiado";
+        setTimeout(() => (btn.textContent = oldText), 1200);
+      }
+    } catch {
+      alert("Não foi possível copiar automaticamente. Copie manualmente: " + companyId);
+    }
+  });
+
+  document.getElementById("dcGoLogin")?.addEventListener("click", () => {
+    // volta para a tela de login
+    document.getElementById("screen-onboard")?.classList.remove("screen--active");
+    document.getElementById("screen-app")?.classList.remove("screen--active");
+    document.getElementById("screen-lock")?.classList.add("screen--active");
+    close();
+  });
+}
 
   /* =======================
      4) DB (load/save) + SUPABASE
@@ -774,6 +860,11 @@ showCompanyIdModal(companyId);
   window.addEventListener("DOMContentLoaded", () => {
     DC_INIT.start();
   });
+const last = localStorage.getItem("DC_ONE_LAST_COMPANY_ID");
+const loginCompanyInput = document.getElementById("loginCompanyId");
+if (last && loginCompanyInput && !loginCompanyInput.value) {
+  loginCompanyInput.value = last;
+}
 
   // expõe (opcional) para debug
   window.DC_ONE = { DC_CONFIG, DC_STATE, DC_HELPERS, DC_DB, DC_LOGIC, DC_UI };
