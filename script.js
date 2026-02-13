@@ -327,7 +327,19 @@
         // criar empresa + admin
         const createdCompany = await DC_DB.createCompanyWithAdmin({ company, admin });
 
-        toast(`Empresa criada! ID: ${createdCompany.company_code}`, "ok");
+       // --- ID da empresa: mostrar grande + copiar + guardar
+const companyId = created.company_code;
+
+// 1) guardar no localStorage
+localStorage.setItem("DC_ONE_LAST_COMPANY_ID", companyId);
+
+// 2) preencher o campo de login automaticamente
+const loginCompanyInput = document.getElementById("loginCompanyId");
+if (loginCompanyInput) loginCompanyInput.value = companyId;
+
+// 3) mostrar modal fixo (não desaparece)
+showCompanyIdModal(companyId);
+
 
         // login imediato
         const res = await DC_DB.login(createdCompany.company_code, admin.username, admin.pass);
