@@ -92,156 +92,171 @@
     }
   };
 
-  /* =======================
-     3) HELPERS
-  ======================= */
-  const DC_HELPERS = (() => {
-    const $ = (sel, root = document) => root.querySelector(sel);
-    const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
-    const sanitize = (s) => String(s ?? "").trim();
-    const slug = (s) => sanitize(s).toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9\-]/g, "");
+/* =======================
+   3) HELPERS
+======================= */
+const DC_HELPERS = (() => {
+  const $ = (sel, root = document) => root.querySelector(sel);
+  const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 
-    const randomDigits = (n = 6) => {
-      let out = "";
-      for (let i = 0; i < n; i++) out += Math.floor(Math.random() * 10);
-      return out;
-    };
+  const sanitize = (s) => String(s ?? "").trim();
+  const slug = (s) => sanitize(s).toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9\-]/g, "");
 
-    const generateCompanyCode = () => `DC-${randomDigits(6)}`;
+  const randomDigits = (n = 6) => Array.from({ length: n }, () => Math.floor(Math.random() * 10)).join("");
+  const generateCompanyCode = () => `DC-${randomDigits(6)}`;
 
-    const makeAuthEmail = (companyCode, username) => {
-      const code = slug(companyCode);
-      const user = slug(username);
-      return `${user}@${code}.${DC_CONFIG.AUTH_EMAIL_DOMAIN}`;
-    };
+  const makeAuthEmail = (companyCode, username) => {
+    const code = slug(companyCode);
+    const user = slug(username);
+    return `${user}@${code}.${DC_CONFIG.AUTH_EMAIL_DOMAIN}`;
+  };
 
-    const pickModulesForBranch = (branch) => {
-      const map = DC_CONFIG.TEMPLATE_MODULES;
-      return map[branch] || map.default;
-    };
+  const pickModulesForBranch = (branch) => {
+    const map = DC_CONFIG.TEMPLATE_MODULES;
+    return map[branch] || map.default;
+  };
 
-    const toast = (msg, type = "info") => {
-      const wrapId = "toastWrap";
-      let wrap = document.getElementById(wrapId);
+  const toast = (msg, type = "info") => {
+    const wrapId = "toastWrap";
+    let wrap = document.getElementById(wrapId);
 
-      if (!wrap) {
-        wrap = document.createElement("div");
-        wrap.id = wrapId;
-        wrap.style.cssText = "position:fixed;right:18px;bottom:18px;display:flex;flex-direction:column;gap:10px;z-index:99999;";
-        document.body.appendChild(wrap);
+    if (!wrap) {
+      wrap = document.createElement("div");
+      wrap.id = wrapId;
+      wrap.style.cssText =
+        "position:fixed;right:18px;bottom:18px;display:flex;flex-direction:column;gap:10px;z-index:99999;";
+      document.body.appendChild(wrap);
 
-        const st = document.createElement("style");
-        st.textContent = `
-          .toast{padding:12px 14px;border-radius:14px;border:1px solid rgba(0,0,0,.08);background:#fff;box-shadow:0 10px 30px rgba(0,0,0,.12);font-weight:800;max-width:360px}
-          .toast--info{border-color:rgba(31,111,235,.35)}
-          .toast--ok{border-color:rgba(22,163,74,.35)}
-          .toast--warn{border-color:rgba(245,158,11,.45)}
-          .toast--err{border-color:rgba(239,68,68,.45)}
-        `;
-        document.head.appendChild(st);
-      }
-
-      const el = document.createElement("div");
-      el.className = `toast toast--${type}`;
-      el.textContent = msg;
-      wrap.appendChild(el);
-
-      setTimeout(() => {
-        el.style.opacity = "0";
-        el.style.transform = "translateY(6px)";
-        el.style.transition = "all .25s ease";
-      }, 2200);
-      setTimeout(() => el.remove(), 2600);
-    };
-
-    return { $, $$, sanitize, slug, generateCompanyCode, makeAuthEmail, pickModulesForBranch, toast };
-  })();
-function showCompanyIdModal(companyId) {
-  // remove modal anterior se existir
-  const old = document.getElementById("dcCompanyIdModal");
-  if (old) old.remove();
-
-  const overlay = document.createElement("div");
-  overlay.id = "dcCompanyIdModal";
-  overlay.style.cssText = `
-    position:fixed;inset:0;background:rgba(0,0,0,.55);
-    display:flex;align-items:center;justify-content:center;
-    z-index:999999;padding:18px;
-  `;
-
-  const box = document.createElement("div");
-  box.style.cssText = `
-    width:min(520px, 100%); background:#fff; border-radius:18px;
-    padding:18px 18px 14px; box-shadow:0 20px 60px rgba(0,0,0,.25);
-    border:1px solid rgba(0,0,0,.08);
-  `;
-
-  box.innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
-      <div style="font-weight:900;font-size:18px">✅ Empresa criada</div>
-      <button id="dcCloseCompanyId" style="
-        border:none;background:transparent;font-size:18px;font-weight:900;cursor:pointer
-      ">✕</button>
-    </div>
-
-    <p style="margin:10px 0 10px;color:#334155;font-weight:700">
-      Guarda este <b>ID da Empresa</b> (vais usar sempre para entrar):
-    </p>
-
-    <div style="
-      font-size:28px;font-weight:950;letter-spacing:1px;
-      padding:14px;border-radius:14px;background:#f1f5f9;border:1px solid rgba(0,0,0,.08);
-      text-align:center;
-    " id="dcCompanyIdText">${companyId}</div>
-
-    <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap">
-      <button id="dcCopyCompanyId" style="
-        flex:1;min-width:180px;padding:12px 14px;border-radius:14px;
-        border:1px solid rgba(0,0,0,.12); background:#0ea5e9;color:#fff;font-weight:900;cursor:pointer
-      ">Copiar ID</button>
-
-      <button id="dcGoLogin" style="
-        flex:1;min-width:180px;padding:12px 14px;border-radius:14px;
-        border:1px solid rgba(0,0,0,.12); background:#16a34a;color:#fff;font-weight:900;cursor:pointer
-      ">Ir para Login</button>
-    </div>
-
-    <p style="margin:10px 0 0;color:#64748b;font-weight:700;font-size:12px">
-      Último ID guardado neste dispositivo: <span style="font-weight:900">${localStorage.getItem("DC_ONE_LAST_COMPANY_ID") || companyId}</span>
-    </p>
-  `;
-
-  overlay.appendChild(box);
-  document.body.appendChild(overlay);
-
-  const close = () => overlay.remove();
-
-  document.getElementById("dcCloseCompanyId")?.addEventListener("click", close);
-  overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
-
-  document.getElementById("dcCopyCompanyId")?.addEventListener("click", async () => {
-    try {
-      await navigator.clipboard.writeText(companyId);
-      // feedback rápido
-      const btn = document.getElementById("dcCopyCompanyId");
-      if (btn) {
-        const oldText = btn.textContent;
-        btn.textContent = "✅ Copiado";
-        setTimeout(() => (btn.textContent = oldText), 1200);
-      }
-    } catch {
-      alert("Não foi possível copiar automaticamente. Copie manualmente: " + companyId);
+      const st = document.createElement("style");
+      st.textContent = `
+        .toast{padding:12px 14px;border-radius:14px;border:1px solid rgba(0,0,0,.08);background:#fff;box-shadow:0 10px 30px rgba(0,0,0,.12);font-weight:800;max-width:360px}
+        .toast--info{border-color:rgba(31,111,235,.35)}
+        .toast--ok{border-color:rgba(22,163,74,.35)}
+        .toast--warn{border-color:rgba(245,158,11,.45)}
+        .toast--err{border-color:rgba(239,68,68,.45)}
+      `;
+      document.head.appendChild(st);
     }
-  });
 
-  document.getElementById("dcGoLogin")?.addEventListener("click", () => {
-    // volta para a tela de login
-    document.getElementById("screen-onboard")?.classList.remove("screen--active");
-    document.getElementById("screen-app")?.classList.remove("screen--active");
-    document.getElementById("screen-lock")?.classList.add("screen--active");
-    close();
-  });
-}
+    const el = document.createElement("div");
+    el.className = `toast toast--${type}`;
+    el.textContent = msg;
+    wrap.appendChild(el);
+
+    setTimeout(() => {
+      el.style.opacity = "0";
+      el.style.transform = "translateY(6px)";
+      el.style.transition = "all .25s ease";
+    }, 2200);
+    setTimeout(() => el.remove(), 2600);
+  };
+
+  // MODAL fixo para mostrar ID da empresa (não some)
+  const showCompanyIdModal = (companyId) => {
+    const old = document.getElementById("dcCompanyIdModal");
+    if (old) old.remove();
+
+    const overlay = document.createElement("div");
+    overlay.id = "dcCompanyIdModal";
+    overlay.style.cssText = `
+      position:fixed;inset:0;background:rgba(0,0,0,.55);
+      display:flex;align-items:center;justify-content:center;
+      z-index:999999;padding:18px;
+    `;
+
+    const box = document.createElement("div");
+    box.style.cssText = `
+      width:min(520px, 100%); background:#fff; border-radius:18px;
+      padding:18px 18px 14px; box-shadow:0 20px 60px rgba(0,0,0,.25);
+      border:1px solid rgba(0,0,0,.08);
+    `;
+
+    box.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+        <div style="font-weight:900;font-size:18px">✅ Empresa criada</div>
+        <button id="dcCloseCompanyId" style="border:none;background:transparent;font-size:18px;font-weight:900;cursor:pointer">✕</button>
+      </div>
+
+      <p style="margin:10px 0 10px;color:#334155;font-weight:700">
+        Guarda este <b>ID da Empresa</b> (vais usar sempre para entrar):
+      </p>
+
+      <div style="
+        font-size:28px;font-weight:950;letter-spacing:1px;
+        padding:14px;border-radius:14px;background:#f1f5f9;border:1px solid rgba(0,0,0,.08);
+        text-align:center;
+      " id="dcCompanyIdText">${companyId}</div>
+
+      <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap">
+        <button id="dcCopyCompanyId" style="
+          flex:1;min-width:180px;padding:12px 14px;border-radius:14px;
+          border:1px solid rgba(0,0,0,.12); background:#0ea5e9;color:#fff;font-weight:900;cursor:pointer
+        ">Copiar ID</button>
+
+        <button id="dcGoLogin" style="
+          flex:1;min-width:180px;padding:12px 14px;border-radius:14px;
+          border:1px solid rgba(0,0,0,.12); background:#16a34a;color:#fff;font-weight:900;cursor:pointer
+        ">Ir para Login</button>
+      </div>
+
+      <p style="margin:10px 0 0;color:#64748b;font-weight:700;font-size:12px">
+        Último ID guardado neste dispositivo:
+        <span style="font-weight:900">${localStorage.getItem("DC_ONE_LAST_COMPANY_ID") || companyId}</span>
+      </p>
+    `;
+
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+
+    const close = () => overlay.remove();
+
+    document.getElementById("dcCloseCompanyId")?.addEventListener("click", close);
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
+
+    document.getElementById("dcCopyCompanyId")?.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(companyId);
+        const btn = document.getElementById("dcCopyCompanyId");
+        if (btn) {
+          const oldText = btn.textContent;
+          btn.textContent = "✅ Copiado";
+          setTimeout(() => (btn.textContent = oldText), 1200);
+        }
+      } catch {
+        alert("Não foi possível copiar automaticamente. Copie manualmente: " + companyId);
+      }
+    });
+
+    document.getElementById("dcGoLogin")?.addEventListener("click", () => {
+      document.getElementById("screen-onboard")?.classList.remove("screen--active");
+      document.getElementById("screen-app")?.classList.remove("screen--active");
+      document.getElementById("screen-lock")?.classList.add("screen--active");
+      close();
+    });
+  };
+
+  // preenche o ID salvo no login (usado no INIT)
+  const applyLastCompanyIdToLogin = () => {
+    const last = localStorage.getItem("DC_ONE_LAST_COMPANY_ID");
+    const loginCompanyInput = document.getElementById("loginCompanyId");
+    if (last && loginCompanyInput && !loginCompanyInput.value) {
+      loginCompanyInput.value = last;
+    }
+  };
+
+  return {
+    $,
+    $$,
+    sanitize,
+    slug,
+    generateCompanyCode,
+    makeAuthEmail,
+    pickModulesForBranch,
+    toast,
+    showCompanyIdModal,
+    applyLastCompanyIdToLogin
+  };
+})();
 
   /* =======================
      4) DB (load/save) + SUPABASE
@@ -367,160 +382,160 @@ function showCompanyIdModal(companyId) {
     return api;
   })();
 
-  /* =======================
-     5) LÓGICA
-  ======================= */
-  const DC_LOGIC = (() => {
-    const { sanitize, toast, generateCompanyCode, pickModulesForBranch } = DC_HELPERS;
-    const { setSession, setUI } = DC_STATE;
+ /* =======================
+   5) LÓGICA
+======================= */
+const DC_LOGIC = (() => {
+  const { sanitize, generateCompanyCode, pickModulesForBranch, showCompanyIdModal } = DC_HELPERS;
+  const { setSession, setUI } = DC_STATE;
 
-    return {
-      async createCompanyFlow(formData) {
-        const companyCode = generateCompanyCode();
+  return {
+    async createCompanyFlow(formData) {
+      const companyCode = generateCompanyCode();
 
-        // validações
-        if (!formData.branch) throw new Error("Selecione o ramo/template.");
-        if (!DC_CONFIG.PLANS.includes(formData.plan)) throw new Error("Plano inválido.");
+      // validações
+      if (!formData.branch) throw new Error("Selecione o ramo/template.");
+      if (!DC_CONFIG.PLANS.includes(formData.plan)) throw new Error("Plano inválido.");
 
-        if (!formData.adminUser) formData.adminUser = "admin";
+      if (!formData.adminUser) formData.adminUser = "admin";
 
-        if (!formData.adminPass || formData.adminPass.length < 6) {
-          throw new Error("A palavra-passe do admin deve ter pelo menos 6 caracteres.");
-        }
-        if (formData.adminPass !== formData.adminPass2) {
-          throw new Error("As palavras-passe não coincidem.");
-        }
-
-        const company = {
-          company_code: companyCode,
-          name: sanitize(formData.name),
-          branch: formData.branch,
-          plan: formData.plan,
-          nuit: sanitize(formData.nuit) || null,
-          email: sanitize(formData.email) || null,
-          phone: sanitize(formData.phone) || null,
-          address: sanitize(formData.address) || null,
-          city: sanitize(formData.city) || null,
-          country: sanitize(formData.country) || null
-        };
-
-        const admin = {
-          fullName: sanitize(formData.adminFullName) || null,
-          username: sanitize(formData.adminUser),
-          pass: formData.adminPass
-        };
-
-        // criar empresa + admin
-        const createdCompany = await DC_DB.createCompanyWithAdmin({ company, admin });
-
-       // --- ID da empresa: mostrar grande + copiar + guardar
-const companyId = created.company_code;
-
-// 1) guardar no localStorage
-localStorage.setItem("DC_ONE_LAST_COMPANY_ID", companyId);
-
-// 2) preencher o campo de login automaticamente
-const loginCompanyInput = document.getElementById("loginCompanyId");
-if (loginCompanyInput) loginCompanyInput.value = companyId;
-
-// 3) mostrar modal fixo (não desaparece)
-showCompanyIdModal(companyId);
-
-
-        // login imediato
-        const res = await DC_DB.login(createdCompany.company_code, admin.username, admin.pass);
-
-        const comp = res.profile.companies;
-        const modules = pickModulesForBranch(comp.branch);
-
-        setSession({
-          isAuthed: true,
-          userId: res.authRes.user.id,
-          companyId: comp.id,
-          companyCode: comp.company_code,
-          username: res.profile.username,
-          role: res.profile.role,
-          plan: comp.plan,
-          branch: comp.branch,
-          companyName: comp.name
-        });
-
-        setUI({
-          currentScreen: "app",
-          currentRoute: "dashboard",
-          modules
-        });
-
-        return true;
-      },
-
-      async loginFlow(companyCode, username, password) {
-        companyCode = sanitize(companyCode);
-        username = sanitize(username);
-        if (!companyCode || !username || !password) throw new Error("Preencha todos os campos do login.");
-
-        const res = await DC_DB.login(companyCode, username, password);
-        const comp = res.profile.companies;
-        const modules = pickModulesForBranch(comp.branch);
-
-        DC_STATE.setSession({
-          isAuthed: true,
-          userId: res.authRes.user.id,
-          companyId: comp.id,
-          companyCode: comp.company_code,
-          username: res.profile.username,
-          role: res.profile.role,
-          plan: comp.plan,
-          branch: comp.branch,
-          companyName: comp.name
-        });
-
-        DC_STATE.setUI({
-          currentScreen: "app",
-          currentRoute: "dashboard",
-          modules
-        });
-
-        DC_HELPERS.toast("Login com sucesso.", "ok");
-        return true;
-      },
-
-      async restoreSessionFlow() {
-        const restored = await DC_DB.restore();
-        if (!restored) return false;
-
-        const comp = restored.profile.companies;
-        const modules = DC_HELPERS.pickModulesForBranch(comp.branch);
-
-        DC_STATE.setSession({
-          isAuthed: true,
-          userId: restored.profile.id,
-          companyId: comp.id,
-          companyCode: comp.company_code,
-          username: restored.profile.username,
-          role: restored.profile.role,
-          plan: comp.plan,
-          branch: comp.branch,
-          companyName: comp.name
-        });
-
-        DC_STATE.setUI({
-          currentScreen: "app",
-          currentRoute: "dashboard",
-          modules
-        });
-
-        return true;
-      },
-
-      async logoutFlow() {
-        await DC_DB.logout();
-        DC_STATE.resetSession();
-        DC_STATE.setUI({ currentScreen: "lock", currentRoute: "dashboard", modules: [] });
-        DC_HELPERS.toast("Sessão terminada.", "info");
+      if (!formData.adminPass || formData.adminPass.length < 6) {
+        throw new Error("A palavra-passe do admin deve ter pelo menos 6 caracteres.");
       }
-    };
-  })();
+      if (formData.adminPass !== formData.adminPass2) {
+        throw new Error("As palavras-passe não coincidem.");
+      }
+
+      const company = {
+        company_code: companyCode,
+        name: sanitize(formData.name),
+        branch: formData.branch,
+        plan: formData.plan,
+        nuit: sanitize(formData.nuit) || null,
+        email: sanitize(formData.email) || null,
+        phone: sanitize(formData.phone) || null,
+        address: sanitize(formData.address) || null,
+        city: sanitize(formData.city) || null,
+        country: sanitize(formData.country) || null
+      };
+
+      const admin = {
+        fullName: sanitize(formData.adminFullName) || null,
+        username: sanitize(formData.adminUser),
+        pass: formData.adminPass
+      };
+
+      // criar empresa + admin
+      const createdCompany = await DC_DB.createCompanyWithAdmin({ company, admin });
+
+      // --- ID da empresa: mostrar grande + copiar + guardar
+      const companyId = createdCompany.company_code;
+
+      // 1) guardar no localStorage
+      localStorage.setItem("DC_ONE_LAST_COMPANY_ID", companyId);
+
+      // 2) preencher o campo de login automaticamente (para já ficar)
+      const loginCompanyInput = document.getElementById("loginCompanyId");
+      if (loginCompanyInput) loginCompanyInput.value = companyId;
+
+      // 3) mostrar modal fixo (não desaparece)
+      showCompanyIdModal(companyId);
+
+      // login imediato
+      const res = await DC_DB.login(createdCompany.company_code, admin.username, admin.pass);
+
+      const comp = res.profile.companies;
+      const modules = pickModulesForBranch(comp.branch);
+
+      setSession({
+        isAuthed: true,
+        userId: res.authRes.user.id,
+        companyId: comp.id,
+        companyCode: comp.company_code,
+        username: res.profile.username,
+        role: res.profile.role,
+        plan: comp.plan,
+        branch: comp.branch,
+        companyName: comp.name
+      });
+
+      setUI({
+        currentScreen: "app",
+        currentRoute: "dashboard",
+        modules
+      });
+
+      return true;
+    },
+
+    async loginFlow(companyCode, username, password) {
+      companyCode = sanitize(companyCode);
+      username = sanitize(username);
+      if (!companyCode || !username || !password) throw new Error("Preencha todos os campos do login.");
+
+      const res = await DC_DB.login(companyCode, username, password);
+      const comp = res.profile.companies;
+      const modules = pickModulesForBranch(comp.branch);
+
+      setSession({
+        isAuthed: true,
+        userId: res.authRes.user.id,
+        companyId: comp.id,
+        companyCode: comp.company_code,
+        username: res.profile.username,
+        role: res.profile.role,
+        plan: comp.plan,
+        branch: comp.branch,
+        companyName: comp.name
+      });
+
+      setUI({
+        currentScreen: "app",
+        currentRoute: "dashboard",
+        modules
+      });
+
+      DC_HELPERS.toast("Login com sucesso.", "ok");
+      return true;
+    },
+
+    async restoreSessionFlow() {
+      const restored = await DC_DB.restore();
+      if (!restored) return false;
+
+      const comp = restored.profile.companies;
+      const modules = pickModulesForBranch(comp.branch);
+
+      setSession({
+        isAuthed: true,
+        userId: restored.profile.id,
+        companyId: comp.id,
+        companyCode: comp.company_code,
+        username: restored.profile.username,
+        role: restored.profile.role,
+        plan: comp.plan,
+        branch: comp.branch,
+        companyName: comp.name
+      });
+
+      setUI({
+        currentScreen: "app",
+        currentRoute: "dashboard",
+        modules
+      });
+
+      return true;
+    },
+
+    async logoutFlow() {
+      await DC_DB.logout();
+      DC_STATE.resetSession();
+      setUI({ currentScreen: "lock", currentRoute: "dashboard", modules: [] });
+      DC_HELPERS.toast("Sessão terminada.", "info");
+    }
+  };
+})();
+
 
   /* =======================
      6) UI
@@ -827,45 +842,46 @@ showCompanyIdModal(companyId);
     return { bind };
   })();
 
-  /* =======================
-     8) START / INIT
-  ======================= */
-  const DC_INIT = (() => {
-    const start = async () => {
-      // segurança mínima
-      if (!DC_CONFIG.SUPABASE_URL.includes("supabase.co")) {
-        DC_HELPERS.toast("Config do Supabase ainda não foi definida no script.js", "warn");
+ /* =======================
+   8) START / INIT
+======================= */
+const DC_INIT = (() => {
+  const start = async () => {
+    // segurança mínima
+    if (!DC_CONFIG.SUPABASE_URL || !DC_CONFIG.SUPABASE_URL.includes("supabase.co")) {
+      DC_HELPERS.toast("Config do Supabase ainda não foi definida no script.js", "warn");
+    }
+
+    // liga eventos
+    DC_EVENTS.bind();
+
+    // aplica último ID no campo de login (se existir)
+    DC_HELPERS.applyLastCompanyIdToLogin();
+
+    // tenta restaurar sessão
+    try {
+      const ok = await DC_LOGIC.restoreSessionFlow();
+      if (ok) {
+        DC_STATE.setUI({ currentScreen: "app" });
+        DC_UI.syncAll();
+        return;
       }
+    } catch (_) {
+      // ignora
+    }
 
-      DC_EVENTS.bind();
+    // fallback para login
+    DC_STATE.setUI({ currentScreen: "lock" });
+    DC_UI.syncAll();
+  };
 
-      // tenta restaurar sessão
-      try {
-        const ok = await DC_LOGIC.restoreSessionFlow();
-        if (ok) {
-          DC_STATE.setUI({ currentScreen: "app" });
-          DC_UI.syncAll();
-          return;
-        }
-      } catch (_) { /* ignora */ }
-
-      DC_STATE.setUI({ currentScreen: "lock" });
-      DC_UI.syncAll();
-    };
-
-    return { start };
-  })();
-
-  // START
-  window.addEventListener("DOMContentLoaded", () => {
-    DC_INIT.start();
-  });
-const last = localStorage.getItem("DC_ONE_LAST_COMPANY_ID");
-const loginCompanyInput = document.getElementById("loginCompanyId");
-if (last && loginCompanyInput && !loginCompanyInput.value) {
-  loginCompanyInput.value = last;
-}
-
-  // expõe (opcional) para debug
-  window.DC_ONE = { DC_CONFIG, DC_STATE, DC_HELPERS, DC_DB, DC_LOGIC, DC_UI };
+  return { start };
 })();
+
+// START
+window.addEventListener("DOMContentLoaded", () => {
+  DC_INIT.start();
+});
+
+// expõe (opcional) para debug
+window.DC_ONE = { DC_CONFIG, DC_STATE, DC_HELPERS, DC_DB, DC_LOGIC, DC_UI };
