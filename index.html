@@ -1,14 +1,12 @@
 <!doctype html>
 <html lang="pt">
-
-
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>DC ONE</title>
-<link rel="stylesheet" href="./styles.css">
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-   <script src="script.js"></script>
+
+  <!-- CSS na raiz -->
+  <link rel="stylesheet" href="./styles.css" />
 </head>
 
 <body>
@@ -75,7 +73,6 @@
         </div>
       </div>
     </section>
-
 
     <!-- 2) ONBOARDING / CRIAR EMPRESA -->
     <section id="screen-onboard" class="screen">
@@ -236,7 +233,6 @@
       </div>
     </section>
 
-
     <!-- 3) APP PRINCIPAL (ERP) -->
     <section id="screen-app" class="screen">
       <div class="layout">
@@ -294,7 +290,6 @@
           </header>
 
           <section id="content" class="content">
-            <!-- Conteúdo carregado pela UI.js -->
             <div class="card">
               <h2 class="subtitle">Bem-vinda(o) ao DC ONE</h2>
               <p class="muted">O conteúdo do módulo selecionado aparece aqui.</p>
@@ -306,8 +301,8 @@
 
   </div>
 
- 
+  <!-- Scripts no fim do body (recomendado) -->
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <script src="./script.js"></script>
 </body>
- 
 </html>
-
