@@ -382,12 +382,12 @@ const DC_HELPERS = (() => {
     return api;
   })();
 
- /* =======================
+
+/* =======================
    5) LÓGICA
 ======================= */
 const DC_LOGIC = (() => {
   const { sanitize, generateCompanyCode, pickModulesForBranch, showCompanyIdModal } = DC_HELPERS;
-  const { setSession, setUI } = DC_STATE;
 
   return {
     async createCompanyFlow(formData) {
@@ -447,7 +447,7 @@ const DC_LOGIC = (() => {
       const comp = res.profile.companies;
       const modules = pickModulesForBranch(comp.branch);
 
-      setSession({
+      DC_STATE.setSession({
         isAuthed: true,
         userId: res.authRes.user.id,
         companyId: comp.id,
@@ -459,7 +459,7 @@ const DC_LOGIC = (() => {
         companyName: comp.name
       });
 
-      setUI({
+      DC_STATE.setUI({
         currentScreen: "app",
         currentRoute: "dashboard",
         modules
@@ -477,7 +477,7 @@ const DC_LOGIC = (() => {
       const comp = res.profile.companies;
       const modules = pickModulesForBranch(comp.branch);
 
-      setSession({
+      DC_STATE.setSession({
         isAuthed: true,
         userId: res.authRes.user.id,
         companyId: comp.id,
@@ -489,7 +489,7 @@ const DC_LOGIC = (() => {
         companyName: comp.name
       });
 
-      setUI({
+      DC_STATE.setUI({
         currentScreen: "app",
         currentRoute: "dashboard",
         modules
@@ -506,7 +506,7 @@ const DC_LOGIC = (() => {
       const comp = restored.profile.companies;
       const modules = pickModulesForBranch(comp.branch);
 
-      setSession({
+      DC_STATE.setSession({
         isAuthed: true,
         userId: restored.profile.id,
         companyId: comp.id,
@@ -518,7 +518,7 @@ const DC_LOGIC = (() => {
         companyName: comp.name
       });
 
-      setUI({
+      DC_STATE.setUI({
         currentScreen: "app",
         currentRoute: "dashboard",
         modules
@@ -530,7 +530,7 @@ const DC_LOGIC = (() => {
     async logoutFlow() {
       await DC_DB.logout();
       DC_STATE.resetSession();
-      setUI({ currentScreen: "lock", currentRoute: "dashboard", modules: [] });
+      DC_STATE.setUI({ currentScreen: "lock", currentRoute: "dashboard", modules: [] });
       DC_HELPERS.toast("Sessão terminada.", "info");
     }
   };
