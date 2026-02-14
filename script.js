@@ -543,7 +543,8 @@ const STOCK_LOGIC = (() => {
 
   const sb = () => DC_DB.supabase; // ✅ supabase client certo
 
-  async function createOut({
+  async function createStockOut({
+
     company_id,
     branch_id,
     warehouse_id,
@@ -563,7 +564,8 @@ const STOCK_LOGIC = (() => {
 
     // 2) Produto simples
     if (product.product_type === "SIMPLE") {
-      const { error: e2 } = await sb().from("_moves").insert({
+      const { error: e2 } = await sb().from("stock_moves").insert({
+
         company_id,
         branch_id,
         warehouse_id,
@@ -709,85 +711,111 @@ const STOCK_LOGIC = (() => {
             <p class="muted small">Próximo passo: tabelas sales, sale_items, payments.</p>
           </div>
         `,
-     stock: `
+    stock: `
   <div class="card">
     <h2 class="subtitle">Stock</h2>
-    <p class="muted">Entradas e Saídas rápidas (teste).</p>
+    <p class="muted">Entradas e saídas rápidas + saldo por armazém.</p>
     <div class="divider"></div>
 
+    <!-- IN / OUT -->
     <div class="grid grid--2" style="gap:14px">
       <!-- ENTRADA -->
       <div class="card" style="padding:14px">
         <div class="subtitle subtitle--sm">Entrada (IN)</div>
+
         <form id="stockInForm" style="display:grid;gap:10px;margin-top:10px">
-          <select id="inProduct" style="width:100%;padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12)"></select>
+          <select id="inProduct"
+            style="width:100%;padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12)"></select>
+
           <input id="inQty" type="number" step="0.001" value="1"
             style="width:100%;padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12)"/>
-          <select id="inWarehouse" style="width:100%;padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12)"></select>
-          <input id="inNote" placeholder="Nota (opcional)" 
+
+          <select id="inWarehouse"
+            style="width:100%;padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12)"></select>
+
+          <input id="inNote" placeholder="Nota (opcional)"
             style="width:100%;padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12)"/>
-          <button type="submit" style="padding:12px 14px;border-radius:14px;border:1px solid rgba(0,0,0,.12);font-weight:900;cursor:pointer">
+
+          <button type="submit"
+            style="padding:12px 14px;border-radius:14px;border:1px solid rgba(0,0,0,.12);font-weight:900;cursor:pointer">
             Confirmar Entrada
           </button>
         </form>
+
         <p id="inMsg" class="muted small" style="margin-top:10px"></p>
       </div>
 
       <!-- SAÍDA -->
       <div class="card" style="padding:14px">
         <div class="subtitle subtitle--sm">Saída (OUT)</div>
+
         <form id="stockOutForm" style="display:grid;gap:10px;margin-top:10px">
-          <select id="outProduct" style="width:100%;padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12)"></select>
+          <select id="outProduct"
+            style="width:100%;padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12)"></select>
+
           <input id="outQty" type="number" step="0.001" value="1"
             style="width:100%;padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12)"/>
-          <select id="outWarehouse" style="width:100%;padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12)"></select>
-          <input id="outNote" placeholder="Nota (opcional)" 
+
+          <select id="outWarehouse"
+            style="width:100%;padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12)"></select>
+
+          <input id="outNote" placeholder="Nota (opcional)"
             style="width:100%;padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12)"/>
-          <button type="submit" style="padding:12px 14px;border-radius:14px;border:1px solid rgba(0,0,0,.12);font-weight:900;cursor:pointer">
+
+          <button type="submit"
+            style="padding:12px 14px;border-radius:14px;border:1px solid rgba(0,0,0,.12);font-weight:900;cursor:pointer">
             Confirmar Saída
           </button>
         </form>
+
         <p id="outMsg" class="muted small" style="margin-top:10px"></p>
       </div>
-      <div class="card" style="margin-top:14px;padding:14px">
-  <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
-    <div>
-      <div class="subtitle subtitle--sm">Saldo Atual por Armazém</div>
-      <div class="muted small">Fonte: stock_balances (atualiza automático)</div>
     </div>
 
-    <div style="display:flex;gap:10px;align-items:center">
-      <select id="balWarehouse" style="padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12)"></select>
-      <button id="btnRefreshBalances" type="button"
-        style="padding:10px 12px;border-radius:12px;border:1px solid rgba(0,0,0,.12);font-weight:900;cursor:pointer">
-        Atualizar
-      </button>
-    </div>
-  </div>
+    <!-- SALDO POR ARMAZÉM -->
+    <div class="card" style="margin-top:14px;padding:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div>
+          <div class="subtitle subtitle--sm">Saldo Atual por Armazém</div>
+          <div class="muted small">Fonte: stock_balances (atualiza automático)</div>
+        </div>
 
-  <div class="divider"></div>
+        <div style="display:flex;gap:10px;align-items:center">
+          <select id="balWarehouse"
+            style="padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12)"></select>
 
-  <div style="overflow:auto">
-    <table style="width:100%;border-collapse:collapse" id="balTable">
-      <thead>
-        <tr>
-          <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(0,0,0,.08)">Produto</th>
-          <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(0,0,0,.08)">Un</th>
-          <th style="text-align:right;padding:10px;border-bottom:1px solid rgba(0,0,0,.08)">Qtd</th>
-        </tr>
-      </thead>
-      <tbody id="balBody">
-        <tr><td class="muted small" style="padding:10px" colspan="3">Carregando…</td></tr>
-      </tbody>
-    </table>
-  </div>
+          <button id="btnRefreshBalances" type="button"
+            style="padding:10px 12px;border-radius:12px;border:1px solid rgba(0,0,0,.12);font-weight:900;cursor:pointer">
+            Atualizar
+          </button>
+        </div>
+      </div>
 
-  <p id="balMsg" class="muted small" style="margin-top:10px"></p>
-</div>
+      <div class="divider"></div>
 
+      <div style="overflow:auto">
+        <table style="width:100%;border-collapse:collapse">
+          <thead>
+            <tr>
+              <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(0,0,0,.08)">Produto</th>
+              <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(0,0,0,.08)">Un</th>
+              <th style="text-align:right;padding:10px;border-bottom:1px solid rgba(0,0,0,.08)">Qtd</th>
+            </tr>
+          </thead>
+
+          <tbody id="balBody">
+            <tr>
+              <td class="muted small" style="padding:10px" colspan="3">Carregando…</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p id="balMsg" class="muted small" style="margin-top:10px"></p>
     </div>
   </div>
 `,
+
 
         cash: `
           <div class="card">
@@ -1077,66 +1105,7 @@ if (balWhSel) {
       initStockScreen
     };
   })();
-  function renderStockOutScreen() {
-  DC_UI.setContent(`
-    <h2>Saída de Stock</h2>
 
-    <form id="stockOutForm">
-      <label>Produto</label>
-      <select id="product"></select>
-
-      <label>Quantidade</label>
-      <input id="qty" type="number" step="0.001" value="1"/>
-
-      <label>Armazém</label>
-      <select id="warehouse"></select>
-
-      <button type="submit">Confirmar Saída</button>
-    </form>
-  `);
-
-  initStockOutForm();
-  loadProductsAndWarehouses();
-}
-   
-async function loadProductsAndWarehouses() {
-  const sb = DC_STATE.session.supabase;
-
-  const company_id = DC_STATE.company.id;
-  const branch_id = DC_STATE.branch.id;
-
-  const { data: products } = await sb.from("products").select("id,name").eq("company_id", company_id).order("name");
-  const { data: whs } = await sb.from("warehouses").select("id,name").eq("company_id", company_id).eq("branch_id", branch_id).order("name");
-
-  document.getElementById("product").innerHTML =
-    (products || []).map(p => `<option value="${p.id}">${p.name}</option>`).join("");
-
-  document.getElementById("warehouse").innerHTML =
-    (whs || []).map(w => `<option value="${w.id}">${w.name}</option>`).join("");
-}
-
-function initStockOutForm() {
-  const form = document.getElementById("stockOutForm");
-
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-
-    try {
-      await STOCK_LOGIC.createStockOut({
-        company_id: DC_STATE.company.id,
-        branch_id: DC_STATE.branch.id,
-        warehouse_id: document.getElementById("warehouse").value,
-        product_id: document.getElementById("product").value,
-        qty: Number(document.getElementById("qty").value),
-        note: "Saída manual"
-      });
-
-      DC_HELPERS.toast("Saída registada!");
-    } catch (err) {
-      DC_HELPERS.toast(err.message, "error");
-    }
-  });
-}
 
 
 
