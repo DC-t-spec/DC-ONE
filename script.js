@@ -543,7 +543,7 @@ const STOCK_LOGIC = (() => {
 
   const sb = () => DC_DB.supabase; // ✅ supabase client certo
 
-  async function createStockOut({
+  async function createOut({
     company_id,
     branch_id,
     warehouse_id,
@@ -563,7 +563,7 @@ const STOCK_LOGIC = (() => {
 
     // 2) Produto simples
     if (product.product_type === "SIMPLE") {
-      const { error: e2 } = await sb().from("stock_moves").insert({
+      const { error: e2 } = await sb().from("_moves").insert({
         company_id,
         branch_id,
         warehouse_id,
@@ -749,6 +749,42 @@ const STOCK_LOGIC = (() => {
         </form>
         <p id="outMsg" class="muted small" style="margin-top:10px"></p>
       </div>
+      <div class="card" style="margin-top:14px;padding:14px">
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+    <div>
+      <div class="subtitle subtitle--sm">Saldo Atual por Armazém</div>
+      <div class="muted small">Fonte: stock_balances (atualiza automático)</div>
+    </div>
+
+    <div style="display:flex;gap:10px;align-items:center">
+      <select id="balWarehouse" style="padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12)"></select>
+      <button id="btnRefreshBalances" type="button"
+        style="padding:10px 12px;border-radius:12px;border:1px solid rgba(0,0,0,.12);font-weight:900;cursor:pointer">
+        Atualizar
+      </button>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div style="overflow:auto">
+    <table style="width:100%;border-collapse:collapse" id="balTable">
+      <thead>
+        <tr>
+          <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(0,0,0,.08)">Produto</th>
+          <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(0,0,0,.08)">Un</th>
+          <th style="text-align:right;padding:10px;border-bottom:1px solid rgba(0,0,0,.08)">Qtd</th>
+        </tr>
+      </thead>
+      <tbody id="balBody">
+        <tr><td class="muted small" style="padding:10px" colspan="3">Carregando…</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p id="balMsg" class="muted small" style="margin-top:10px"></p>
+</div>
+
     </div>
   </div>
 `,
@@ -964,6 +1000,68 @@ const initStockScreen = async () => {
       DC_HELPERS.toast(err?.message || "Erro", "err");
     }
   });
+   // ===== SALDO POR ARMAZÉM =====
+const balWhSel = document.getElementById("balWarehouse");
+const balBody = document.getElementById("balBody");
+const balMsg = document.getElementById("balMsg");
+
+if (balWhSel) {
+  // preencher dropdown de armazéns
+  balWhSel.innerHTML = (whs || []).map(w => `<option value="${w.id}">${w.name}</option>`).join("");
+
+  const renderBalances = async () => {
+    try {
+      const warehouse_id = balWhSel.value;
+      if (!warehouse_id) {
+        balBody.innerHTML = `<tr><td style="padding:10px" colspan="3">Nenhum armazém.</td></tr>`;
+        return;
+      }
+
+      balMsg.textContent = "A carregar saldos…";
+
+      const { data: rows, error } = await sb
+        .from("stock_balances")
+        .select("qty_on_hand, product_id, products(name, unit)")
+        .eq("company_id", company_id)
+        .eq("warehouse_id", warehouse_id)
+        .order("updated_at", { ascending: false });
+
+      if (error) throw error;
+
+      const list = rows || [];
+
+      if (!list.length) {
+        balBody.innerHTML = `<tr><td class="muted small" style="padding:10px" colspan="3">Sem registos de saldo ainda.</td></tr>`;
+        balMsg.textContent = "";
+        return;
+      }
+
+      balBody.innerHTML = list.map(r => `
+        <tr>
+          <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06)">${r.products?.name || "—"}</td>
+          <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06)">${r.products?.unit || "un"}</td>
+          <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);text-align:right;font-weight:900">
+            ${Number(r.qty_on_hand || 0).toLocaleString()}
+          </td>
+        </tr>
+      `).join("");
+
+      balMsg.textContent = "";
+    } catch (err) {
+      balMsg.textContent = "❌ " + (err?.message || err);
+    }
+  };
+
+  // carrega ao abrir
+  await renderBalances();
+
+  // troca de armazém
+  balWhSel.addEventListener("change", () => renderBalances());
+
+  // botão atualizar
+  document.getElementById("btnRefreshBalances")?.addEventListener("click", () => renderBalances());
+}
+
 };
 
 
