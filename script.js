@@ -1225,6 +1225,7 @@ if (!low.error && low.data?.length) {
       syncAll,
       initStockScreen,
        refreshLowStockBadge
+       
     };
   })();
 
