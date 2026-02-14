@@ -987,6 +987,7 @@ const STOCK_LOGIC = (() => {
         setUserBadge();
         highlightRoute(u.currentRoute);
         setHeader(u.currentRoute);
+         refreshLowStockBadge();
         renderRoute(u.currentRoute);
          if (u.currentRoute === "stock") {
   setTimeout(() => DC_UI.initStockScreen(), 0);
@@ -994,6 +995,31 @@ const STOCK_LOGIC = (() => {
 
       }
     };
+     const refreshLowStockBadge = async () => {
+  const el = document.getElementById("badgeLowStock");
+  if (!el) return;
+
+  try {
+    const sb = DC_DB.supabase;
+    const company_id = DC_STATE.state.session.companyId;
+    if (!company_id) return;
+
+    const { count, error } = await sb
+      .from("vw_stock_low")
+      .select("product_id", { count: "exact", head: true })
+      .eq("company_id", company_id);
+
+    if (error) throw error;
+
+    const n = Number(count || 0);
+    el.textContent = n;
+    el.style.display = n > 0 ? "inline-flex" : "none";
+  } catch (err) {
+    // se falhar, só esconde para não estragar UI
+    el.style.display = "none";
+  }
+};
+
 const initStockScreen = async () => {
   const route = DC_STATE.state.ui.currentRoute;
   if (route !== "stock") return;
@@ -1057,6 +1083,7 @@ fill(document.getElementById("trToWarehouse"), whHtml);
       });
       document.getElementById("inMsg").textContent = "✅ Entrada registada.";
       DC_HELPERS.toast("Entrada registada!", "ok");
+       await DC_UI.refreshLowStockBadge();
     } catch (err) {
       document.getElementById("inMsg").textContent = "❌ " + (err?.message || err);
       DC_HELPERS.toast(err?.message || "Erro", "err");
@@ -1077,6 +1104,7 @@ fill(document.getElementById("trToWarehouse"), whHtml);
       });
       document.getElementById("outMsg").textContent = "✅ Saída registada.";
       DC_HELPERS.toast("Saída registada!", "ok");
+       await DC_UI.refreshLowStockBadge();
     } catch (err) {
       document.getElementById("outMsg").textContent = "❌ " + (err?.message || err);
       DC_HELPERS.toast(err?.message || "Erro", "err");
@@ -1102,6 +1130,7 @@ fill(document.getElementById("trToWarehouse"), whHtml);
 
     document.getElementById("trMsg").textContent = "✅ Transferência registada.";
     DC_HELPERS.toast("Transferência registada!", "ok");
+await DC_UI.refreshLowStockBadge();
 
     // recarrega saldos
     document.getElementById("btnRefreshBalances")?.click();
@@ -1194,7 +1223,8 @@ if (!low.error && low.data?.length) {
       setHeader,
       renderRoute,
       syncAll,
-      initStockScreen
+      initStockScreen,
+       refreshLowStockBadge
     };
   })();
 
@@ -1279,10 +1309,13 @@ if (!low.error && low.data?.length) {
           DC_STATE.setUI({ currentRoute: route });
           DC_UI.highlightRoute(route);
           DC_UI.setHeader(route);
+            
           DC_UI.renderRoute(route);
            if (route === "stock") {
   DC_UI.initStockScreen();
 }
+          
+
 
         });
       });
