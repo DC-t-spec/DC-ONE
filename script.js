@@ -535,35 +535,35 @@ const DC_LOGIC = (() => {
     }
   };
 })();
+
 /* =========================
    STOCK - LÓGICA
 ========================= */
 const STOCK_LOGIC = (() => {
 
-  const sb = () => DC_STATE.session.supabase;
+  const sb = () => DC_DB.supabase; // ✅ supabase client certo
 
-  async function createStockOut({ 
-    company_id, 
-    branch_id, 
-    warehouse_id, 
-    product_id, 
-    qty, 
-    note 
+  async function createStockOut({
+    company_id,
+    branch_id,
+    warehouse_id,
+    product_id,
+    qty,
+    note
   }) {
-
-    // 1️⃣ Buscar produto
+    // 1) Buscar produto
     const { data: product, error } = await sb()
       .from("products")
       .select("id, product_type")
       .eq("id", product_id)
       .single();
-
     if (error) throw error;
 
-    // 2️⃣ Produto simples
-    if (product.product_type === "SIMPLE") {
+    const created_by = DC_STATE.state.session.userId || null;
 
-      return sb().from("stock_moves").insert({
+    // 2) Produto simples
+    if (product.product_type === "SIMPLE") {
+      const { error: e2 } = await sb().from("stock_moves").insert({
         company_id,
         branch_id,
         warehouse_id,
@@ -572,15 +572,18 @@ const STOCK_LOGIC = (() => {
         qty,
         ref_type: "manual",
         ref_note: note || null,
-        created_by: DC_STATE.session.user.id
+        created_by
       });
+      if (e2) throw e2;
+      return true;
     }
 
-    // 3️⃣ Produto BUNDLE (KIT)
-    const { data: components } = await sb()
+    // 3) Produto BUNDLE (KIT)
+    const { data: components, error: e3 } = await sb()
       .from("product_components")
       .select("component_product_id, qty")
       .eq("parent_product_id", product_id);
+    if (e3) throw e3;
 
     if (!components || components.length === 0) {
       throw new Error("Este kit não possui componentes definidos.");
@@ -595,17 +598,18 @@ const STOCK_LOGIC = (() => {
       qty: Number(qty) * Number(c.qty),
       ref_type: "bundle_expand",
       ref_note: note || "Saída via kit",
-      created_by: DC_STATE.session.user.id
+      created_by
     }));
 
-    return sb().from("stock_moves").insert(moves);
+    const { error: e4 } = await sb().from("stock_moves").insert(moves);
+    if (e4) throw e4;
+
+    return true;
   }
 
-  return {
-    createStockOut
-  };
-
+  return { createStockOut };
 })();
+
 
 
   /* =======================
@@ -676,12 +680,38 @@ const STOCK_LOGIC = (() => {
             <p class="muted small">Próximo passo: tabelas sales, sale_items, payments.</p>
           </div>
         `,
-        stock: `
-          <div class="card">
-            <h2 class="subtitle">Stock</h2>
-            <p class="muted">Produtos, entradas, saídas, inventário.</p>
-          </div>
-        `,
+      stock: `
+  <div class="card">
+    <h2 class="subtitle">Stock</h2>
+    <p class="muted">Teste rápido: Saída de stock (simples e kit).</p>
+    <div class="divider"></div>
+
+    <form id="stockOutForm" class="grid" style="gap:12px">
+      <div>
+        <label class="muted small">Produto</label>
+        <select id="product" style="width:100%;padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12)"></select>
+      </div>
+
+      <div>
+        <label class="muted small">Quantidade</label>
+        <input id="qty" type="number" step="0.001" value="1"
+          style="width:100%;padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12)"/>
+      </div>
+
+      <div>
+        <label class="muted small">Armazém</label>
+        <select id="warehouse" style="width:100%;padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12)"></select>
+      </div>
+
+      <button type="submit" style="padding:12px 14px;border-radius:14px;border:1px solid rgba(0,0,0,.12);font-weight:900;cursor:pointer">
+        Confirmar Saída
+      </button>
+    </form>
+
+    <p id="stockMsg" class="muted small" style="margin-top:10px"></p>
+  </div>
+`,
+
         cash: `
           <div class="card">
             <h2 class="subtitle">Caixa</h2>
@@ -803,8 +833,85 @@ const STOCK_LOGIC = (() => {
         highlightRoute(u.currentRoute);
         setHeader(u.currentRoute);
         renderRoute(u.currentRoute);
+         if (u.currentRoute === "stock") {
+  setTimeout(() => DC_UI.initStockScreen(), 0);
+}
+
       }
     };
+     const initStockScreen = async () => {
+  const route = DC_STATE.state.ui.currentRoute;
+  if (route !== "stock") return;
+
+  const sb = DC_DB.supabase;
+  const company_id = DC_STATE.state.session.companyId;
+
+  // Se você ainda não estiver usando branches no app,
+  // branch_id pode ficar null no UI e você escolhe por warehouse.
+  // Mas como tuas tabelas exigem branch_id, vamos usar:
+  // 1) buscar um branch qualquer da empresa (ou o 1º)
+  const { data: branches, error: be } = await sb
+    .from("branches")
+    .select("id,name")
+    .eq("company_id", company_id)
+    .order("created_at", { ascending: true })
+    .limit(1);
+  if (be) throw be;
+
+  const branch_id = branches?.[0]?.id;
+  if (!branch_id) throw new Error("Crie uma filial (branches) para continuar.");
+
+  // carregar products + warehouses
+  const { data: products, error: pe } = await sb
+    .from("products")
+    .select("id,name,product_type")
+    .eq("company_id", company_id)
+    .order("name");
+  if (pe) throw pe;
+
+  const { data: whs, error: we } = await sb
+    .from("warehouses")
+    .select("id,name")
+    .eq("company_id", company_id)
+    .eq("branch_id", branch_id)
+    .order("name");
+  if (we) throw we;
+
+  const productSel = document.getElementById("product");
+  const whSel = document.getElementById("warehouse");
+  if (!productSel || !whSel) return; // tela não está ativa
+
+  productSel.innerHTML = (products || [])
+    .map(p => `<option value="${p.id}">${p.name} (${p.product_type})</option>`)
+    .join("");
+
+  whSel.innerHTML = (whs || [])
+    .map(w => `<option value="${w.id}">${w.name}</option>`)
+    .join("");
+
+  const form = document.getElementById("stockOutForm");
+  form?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    try {
+      await STOCK_LOGIC.createStockOut({
+        company_id,
+        branch_id,
+        warehouse_id: whSel.value,
+        product_id: productSel.value,
+        qty: Number(document.getElementById("qty").value),
+        note: "Teste via UI"
+      });
+
+      document.getElementById("stockMsg").textContent = "✅ Saída registada. Confere stock_moves e stock_balances.";
+      DC_HELPERS.toast("Saída registada!", "ok");
+    } catch (err) {
+      document.getElementById("stockMsg").textContent = "❌ " + (err?.message || err);
+      DC_HELPERS.toast(err?.message || "Erro", "err");
+    }
+  });
+};
+
 
     return {
       showScreen,
@@ -813,7 +920,8 @@ const STOCK_LOGIC = (() => {
       highlightRoute,
       setHeader,
       renderRoute,
-      syncAll
+      syncAll,
+      initStockScreen
     };
   })();
   function renderStockOutScreen() {
@@ -958,6 +1066,10 @@ function initStockOutForm() {
           DC_UI.highlightRoute(route);
           DC_UI.setHeader(route);
           DC_UI.renderRoute(route);
+           if (route === "stock") {
+  DC_UI.initStockScreen();
+}
+
         });
       });
 
