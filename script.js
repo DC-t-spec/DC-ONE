@@ -368,10 +368,11 @@ const DC_HELPERS = (() => {
         return { session, profile };
       },
 
-      async logout() {
-        await auth.signOut();
-      }
-       async transferStock({
+     async logout() {
+  await auth.signOut();
+},
+
+async transferStock({
   company_id,
   branch_id,
   from_warehouse_id,
@@ -391,8 +392,7 @@ const DC_HELPERS = (() => {
   });
   if (error) throw error;
   return data;
-},
-
+}
     };
 
     window.addEventListener("unhandledrejection", (e) => {
@@ -987,8 +987,8 @@ const STOCK_LOGIC = (() => {
         setUserBadge();
         highlightRoute(u.currentRoute);
         setHeader(u.currentRoute);
+       renderRoute(u.currentRoute);
          refreshLowStockBadge();
-        renderRoute(u.currentRoute);
          if (u.currentRoute === "stock") {
   setTimeout(() => DC_UI.initStockScreen(), 0);
 }
@@ -1083,7 +1083,8 @@ fill(document.getElementById("trToWarehouse"), whHtml);
       });
       document.getElementById("inMsg").textContent = "✅ Entrada registada.";
       DC_HELPERS.toast("Entrada registada!", "ok");
-       await DC_UI.refreshLowStockBadge();
+     await refreshLowStockBadge();
+
     } catch (err) {
       document.getElementById("inMsg").textContent = "❌ " + (err?.message || err);
       DC_HELPERS.toast(err?.message || "Erro", "err");
@@ -1104,7 +1105,7 @@ fill(document.getElementById("trToWarehouse"), whHtml);
       });
       document.getElementById("outMsg").textContent = "✅ Saída registada.";
       DC_HELPERS.toast("Saída registada!", "ok");
-       await DC_UI.refreshLowStockBadge();
+      await refreshLowStockBadge();
     } catch (err) {
       document.getElementById("outMsg").textContent = "❌ " + (err?.message || err);
       DC_HELPERS.toast(err?.message || "Erro", "err");
@@ -1130,7 +1131,8 @@ fill(document.getElementById("trToWarehouse"), whHtml);
 
     document.getElementById("trMsg").textContent = "✅ Transferência registada.";
     DC_HELPERS.toast("Transferência registada!", "ok");
-await DC_UI.refreshLowStockBadge();
+await refreshLowStockBadge();
+
 
     // recarrega saldos
     document.getElementById("btnRefreshBalances")?.click();
@@ -1312,6 +1314,7 @@ if (!low.error && low.data?.length) {
           DC_UI.setHeader(route);
             
           DC_UI.renderRoute(route);
+           DC_UI.refreshLowStockBadge();
            if (route === "stock") {
   DC_UI.initStockScreen();
 }
