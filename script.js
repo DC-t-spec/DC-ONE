@@ -633,9 +633,10 @@ const STOCK_LOGIC = (() => {
 }
 
 
-  return { createStockOut };
-         return { createStockOut, createStockIn };
-
+  return {
+    createStockOut,
+    createStockIn
+  };
 })();
 
 
