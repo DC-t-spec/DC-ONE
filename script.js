@@ -535,6 +535,77 @@ const DC_LOGIC = (() => {
     }
   };
 })();
+/* =========================
+   STOCK - LÓGICA
+========================= */
+const STOCK_LOGIC = (() => {
+
+  const sb = () => DC_STATE.session.supabase;
+
+  async function createStockOut({ 
+    company_id, 
+    branch_id, 
+    warehouse_id, 
+    product_id, 
+    qty, 
+    note 
+  }) {
+
+    // 1️⃣ Buscar produto
+    const { data: product, error } = await sb()
+      .from("products")
+      .select("id, product_type")
+      .eq("id", product_id)
+      .single();
+
+    if (error) throw error;
+
+    // 2️⃣ Produto simples
+    if (product.product_type === "SIMPLE") {
+
+      return sb().from("stock_moves").insert({
+        company_id,
+        branch_id,
+        warehouse_id,
+        product_id,
+        move_type: "OUT",
+        qty,
+        ref_type: "manual",
+        ref_note: note || null,
+        created_by: DC_STATE.session.user.id
+      });
+    }
+
+    // 3️⃣ Produto BUNDLE (KIT)
+    const { data: components } = await sb()
+      .from("product_components")
+      .select("component_product_id, qty")
+      .eq("parent_product_id", product_id);
+
+    if (!components || components.length === 0) {
+      throw new Error("Este kit não possui componentes definidos.");
+    }
+
+    const moves = components.map(c => ({
+      company_id,
+      branch_id,
+      warehouse_id,
+      product_id: c.component_product_id,
+      move_type: "OUT",
+      qty: Number(qty) * Number(c.qty),
+      ref_type: "bundle_expand",
+      ref_note: note || "Saída via kit",
+      created_by: DC_STATE.session.user.id
+    }));
+
+    return sb().from("stock_moves").insert(moves);
+  }
+
+  return {
+    createStockOut
+  };
+
+})();
 
 
   /* =======================
@@ -745,6 +816,68 @@ const DC_LOGIC = (() => {
       syncAll
     };
   })();
+  function renderStockOutScreen() {
+  DC_UI.setContent(`
+    <h2>Saída de Stock</h2>
+
+    <form id="stockOutForm">
+      <label>Produto</label>
+      <select id="product"></select>
+
+      <label>Quantidade</label>
+      <input id="qty" type="number" step="0.001" value="1"/>
+
+      <label>Armazém</label>
+      <select id="warehouse"></select>
+
+      <button type="submit">Confirmar Saída</button>
+    </form>
+  `);
+
+  initStockOutForm();
+  loadProductsAndWarehouses();
+}
+   
+async function loadProductsAndWarehouses() {
+  const sb = DC_STATE.session.supabase;
+
+  const company_id = DC_STATE.company.id;
+  const branch_id = DC_STATE.branch.id;
+
+  const { data: products } = await sb.from("products").select("id,name").eq("company_id", company_id).order("name");
+  const { data: whs } = await sb.from("warehouses").select("id,name").eq("company_id", company_id).eq("branch_id", branch_id).order("name");
+
+  document.getElementById("product").innerHTML =
+    (products || []).map(p => `<option value="${p.id}">${p.name}</option>`).join("");
+
+  document.getElementById("warehouse").innerHTML =
+    (whs || []).map(w => `<option value="${w.id}">${w.name}</option>`).join("");
+}
+
+function initStockOutForm() {
+  const form = document.getElementById("stockOutForm");
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    try {
+      await STOCK_LOGIC.createStockOut({
+        company_id: DC_STATE.company.id,
+        branch_id: DC_STATE.branch.id,
+        warehouse_id: document.getElementById("warehouse").value,
+        product_id: document.getElementById("product").value,
+        qty: Number(document.getElementById("qty").value),
+        note: "Saída manual"
+      });
+
+      DC_HELPERS.toast("Saída registada!");
+    } catch (err) {
+      DC_HELPERS.toast(err.message, "error");
+    }
+  });
+}
+
+
 
   /* =======================
      7) EVENTOS
