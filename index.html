@@ -251,7 +251,16 @@
           <nav class="nav">
             <button class="nav__item nav__item--active" data-route="dashboard">Dashboard</button>
             <button class="nav__item" data-route="sales">Vendas</button>
-            <button class="nav__item" data-route="stock">Stock</button>
+            <button class="nav__item" data-route="stock">
+  Stock
+  <span id="badgeLowStock" style="
+    display:none;margin-left:8px;
+    padding:2px 8px;border-radius:999px;
+    font-weight:900;font-size:12px;
+    border:1px solid rgba(0,0,0,.12);
+  ">0</span>
+</button>
+
             <button class="nav__item" data-route="cash">Caixa</button>
             <button class="nav__item" data-route="clients">Clientes</button>
             <button class="nav__item" data-route="suppliers">Fornecedores</button>
