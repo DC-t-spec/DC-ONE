@@ -988,6 +988,12 @@ const STOCK_LOGIC = (() => {
         highlightRoute(u.currentRoute);
         setHeader(u.currentRoute);
        renderRoute(u.currentRoute);
+         // clique no badge abre lista
+document.getElementById("badgeLowStock")?.addEventListener("click", (e) => {
+  e.stopPropagation();
+  openLowStockModal();
+});
+
          refreshLowStockBadge();
          if (u.currentRoute === "stock") {
   setTimeout(() => DC_UI.initStockScreen(), 0);
@@ -1214,6 +1220,141 @@ if (!low.error && low.data?.length) {
 }
 
 };
+const openLowStockModal = async () => {
+  const old = document.getElementById("dcLowStockModal");
+  if (old) old.remove();
+
+  const overlay = document.createElement("div");
+  overlay.id = "dcLowStockModal";
+  overlay.style.cssText = `
+    position:fixed;inset:0;background:rgba(0,0,0,.55);
+    display:flex;align-items:center;justify-content:center;
+    z-index:999999;padding:18px;
+  `;
+
+  const box = document.createElement("div");
+  box.style.cssText = `
+    width:min(860px, 100%); background:#fff; border-radius:18px;
+    padding:16px 16px 12px; box-shadow:0 20px 60px rgba(0,0,0,.25);
+    border:1px solid rgba(0,0,0,.08); max-height:80vh; overflow:auto;
+  `;
+
+  box.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+      <div style="font-weight:950;font-size:16px">⚠️ Stock baixo</div>
+      <button id="dcCloseLowStock" style="border:none;background:transparent;font-size:18px;font-weight:900;cursor:pointer">✕</button>
+    </div>
+
+    <p class="muted small" style="margin:8px 0 10px">
+      Itens com quantidade disponível menor ou igual ao mínimo definido.
+    </p>
+
+    <div id="dcLowStockBody" class="muted small" style="padding:10px 0">A carregar…</div>
+  `;
+
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+
+  const close = () => overlay.remove();
+  document.getElementById("dcCloseLowStock")?.addEventListener("click", close);
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
+
+  try {
+    const sb = DC_DB.supabase;
+    const company_id = DC_STATE.state.session.companyId;
+
+    // 1) buscar alertas
+    const { data: rows, error } = await sb
+      .from("vw_stock_low")
+      .select("*")
+      .eq("company_id", company_id);
+
+    if (error) throw error;
+
+    const list = rows || [];
+    const body = document.getElementById("dcLowStockBody");
+    if (!body) return;
+
+    if (!list.length) {
+      body.innerHTML = `<div style="padding:10px 0;font-weight:800">✅ Sem alertas no momento.</div>`;
+      return;
+    }
+
+    // 2) buscar nomes dos armazéns (para mostrar bonito)
+    const whIds = Array.from(new Set(list.map(r => r.warehouse_id).filter(Boolean)));
+    let whMap = {};
+    if (whIds.length) {
+      const { data: whs, error: we } = await sb
+        .from("warehouses")
+        .select("id,name")
+        .in("id", whIds);
+
+      if (!we && whs) {
+        whMap = Object.fromEntries(whs.map(w => [w.id, w.name]));
+      }
+    }
+
+    // 3) buscar nomes dos produtos (se a view não trouxer)
+    // Se tua vw_stock_low já expõe product_name, não precisa.
+    const hasProductName = list.some(r => "product_name" in r);
+    let prodMap = {};
+    if (!hasProductName) {
+      const pIds = Array.from(new Set(list.map(r => r.product_id).filter(Boolean)));
+      if (pIds.length) {
+        const { data: ps, error: pe } = await sb
+          .from("products")
+          .select("id,name,unit")
+          .in("id", pIds);
+
+        if (!pe && ps) {
+          prodMap = Object.fromEntries(ps.map(p => [p.id, { name: p.name, unit: p.unit }]));
+        }
+      }
+    }
+
+    // 4) render tabela
+    const fmt = (n) => Number(n || 0).toLocaleString();
+
+    body.innerHTML = `
+      <div style="overflow:auto">
+        <table style="width:100%;border-collapse:collapse">
+          <thead>
+            <tr>
+              <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(0,0,0,.08)">Produto</th>
+              <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(0,0,0,.08)">Armazém</th>
+              <th style="text-align:right;padding:10px;border-bottom:1px solid rgba(0,0,0,.08)">Disponível</th>
+              <th style="text-align:right;padding:10px;border-bottom:1px solid rgba(0,0,0,.08)">Mínimo</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${list.map(r => {
+              const whName = whMap[r.warehouse_id] || r.warehouse_id || "—";
+              const pName = r.product_name || prodMap[r.product_id]?.name || r.product_id || "—";
+              const unit = r.unit || prodMap[r.product_id]?.unit || "";
+              return `
+                <tr>
+                  <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);font-weight:900">
+                    ${pName} <span class="muted small" style="font-weight:800"> ${unit ? `(${unit})` : ""}</span>
+                  </td>
+                  <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06)">${whName}</td>
+                  <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);text-align:right;font-weight:900">
+                    ${fmt(r.on_hand)}
+                  </td>
+                  <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);text-align:right;font-weight:900">
+                    ${fmt(r.min_qty)}
+                  </td>
+                </tr>
+              `;
+            }).join("")}
+          </tbody>
+        </table>
+      </div>
+    `;
+  } catch (err) {
+    const body = document.getElementById("dcLowStockBody");
+    if (body) body.innerHTML = `<div style="padding:10px 0;color:#b91c1c;font-weight:900">❌ ${err?.message || err}</div>`;
+  }
+};
 
 
 
@@ -1226,7 +1367,9 @@ if (!low.error && low.data?.length) {
       renderRoute,
       syncAll,
       initStockScreen,
-       refreshLowStockBadge
+       refreshLowStockBadge,
+       openLowStockModal
+
        
     };
   })();
