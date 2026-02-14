@@ -371,6 +371,28 @@ const DC_HELPERS = (() => {
       async logout() {
         await auth.signOut();
       }
+       async transferStock({
+  company_id,
+  branch_id,
+  from_warehouse_id,
+  to_warehouse_id,
+  product_id,
+  qty,
+  ref_note
+}) {
+  const { data, error } = await supabase.rpc("dc_transfer_stock", {
+    p_company_id: company_id,
+    p_branch_id: branch_id,
+    p_from_warehouse_id: from_warehouse_id,
+    p_to_warehouse_id: to_warehouse_id,
+    p_product_id: product_id,
+    p_qty: qty,
+    p_ref_note: ref_note ?? null
+  });
+  if (error) throw error;
+  return data;
+},
+
     };
 
     window.addEventListener("unhandledrejection", (e) => {
@@ -378,6 +400,7 @@ const DC_HELPERS = (() => {
       console.error(e.reason);
       toast(msg, "err");
     });
+
 
     return api;
   })();
@@ -813,6 +836,33 @@ const STOCK_LOGIC = (() => {
 
       <p id="balMsg" class="muted small" style="margin-top:10px"></p>
     </div>
+    <!-- TRANSFERÊNCIA -->
+<div class="card" style="padding:14px">
+  <div class="subtitle subtitle--sm">Transferência (Armazém → Armazém)</div>
+
+  <form id="stockTransferForm" style="display:grid;gap:10px;margin-top:10px">
+    <select id="trProduct" style="width:100%;padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12)"></select>
+
+    <input id="trQty" type="number" step="0.001" value="1"
+      style="width:100%;padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12)"/>
+
+    <select id="trFromWarehouse"
+      style="width:100%;padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12)"></select>
+
+    <select id="trToWarehouse"
+      style="width:100%;padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12)"></select>
+
+    <input id="trNote" placeholder="Nota (opcional)"
+      style="width:100%;padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12)"/>
+
+    <button type="submit"
+      style="padding:12px 14px;border-radius:14px;border:1px solid rgba(0,0,0,.12);font-weight:900;cursor:pointer">
+      Confirmar Transferência
+    </button>
+  </form>
+
+  <p id="trMsg" class="muted small" style="margin-top:10px"></p>
+</div>
   </div>
 `,
 
@@ -988,6 +1038,10 @@ const initStockScreen = async () => {
   fill(document.getElementById("outProduct"), prodHtml);
   fill(document.getElementById("inWarehouse"), whHtml);
   fill(document.getElementById("outWarehouse"), whHtml);
+   fill(document.getElementById("trProduct"), prodHtml);
+fill(document.getElementById("trFromWarehouse"), whHtml);
+fill(document.getElementById("trToWarehouse"), whHtml);
+
 
   // ENTRADA
   document.getElementById("stockInForm")?.addEventListener("submit", async (e) => {
@@ -1028,6 +1082,35 @@ const initStockScreen = async () => {
       DC_HELPERS.toast(err?.message || "Erro", "err");
     }
   });
+   document.getElementById("stockTransferForm")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  try {
+    const fromW = document.getElementById("trFromWarehouse").value;
+    const toW   = document.getElementById("trToWarehouse").value;
+
+    if (fromW === toW) throw new Error("Origem e destino não podem ser o mesmo armazém.");
+
+    await DC_DB.transferStock({
+      company_id,
+      branch_id,
+      from_warehouse_id: fromW,
+      to_warehouse_id: toW,
+      product_id: document.getElementById("trProduct").value,
+      qty: Number(document.getElementById("trQty").value),
+      ref_note: document.getElementById("trNote").value || "Transferência interna"
+    });
+
+    document.getElementById("trMsg").textContent = "✅ Transferência registada.";
+    DC_HELPERS.toast("Transferência registada!", "ok");
+
+    // recarrega saldos
+    document.getElementById("btnRefreshBalances")?.click();
+  } catch (err) {
+    document.getElementById("trMsg").textContent = "❌ " + (err?.message || err);
+    DC_HELPERS.toast(err?.message || "Erro", "err");
+  }
+});
+
    // ===== SALDO POR ARMAZÉM =====
 const balWhSel = document.getElementById("balWarehouse");
 const balBody = document.getElementById("balBody");
@@ -1079,6 +1162,15 @@ if (balWhSel) {
       balMsg.textContent = "❌ " + (err?.message || err);
     }
   };
+   const low = await sb
+  .from("vw_stock_low")
+  .select("product_id, on_hand, min_qty, products(name)")
+  .eq("company_id", company_id);
+
+if (!low.error && low.data?.length) {
+  DC_HELPERS.toast(`⚠️ Stock baixo: ${low.data.length} itens`, "warn");
+}
+
 
   // carrega ao abrir
   await renderBalances();
