@@ -406,175 +406,13 @@ async transferStock({
   })();
 
 
-/* =======================
-   5) LÓGICA
-======================= */
-const DC_LOGIC = (() => {
-  const { sanitize, generateCompanyCode, pickModulesForBranch, showCompanyIdModal } = DC_HELPERS;
-
-  return {
-    async createCompanyFlow(formData) {
-      const companyCode = generateCompanyCode();
-
-      // validações
-      if (!formData.branch) throw new Error("Selecione o ramo/template.");
-      if (!DC_CONFIG.PLANS.includes(formData.plan)) throw new Error("Plano inválido.");
-
-      if (!formData.adminUser) formData.adminUser = "admin";
-
-      if (!formData.adminPass || formData.adminPass.length < 6) {
-        throw new Error("A palavra-passe do admin deve ter pelo menos 6 caracteres.");
-      }
-      if (formData.adminPass !== formData.adminPass2) {
-        throw new Error("As palavras-passe não coincidem.");
-      }
-
-      const company = {
-        company_code: companyCode,
-        name: sanitize(formData.name),
-        branch: formData.branch,
-        plan: formData.plan,
-        nuit: sanitize(formData.nuit) || null,
-        email: sanitize(formData.email) || null,
-        phone: sanitize(formData.phone) || null,
-        address: sanitize(formData.address) || null,
-        city: sanitize(formData.city) || null,
-        country: sanitize(formData.country) || null
-      };
-
-      const admin = {
-        fullName: sanitize(formData.adminFullName) || null,
-        username: sanitize(formData.adminUser),
-        pass: formData.adminPass
-      };
-
-      // criar empresa + admin
-      const createdCompany = await DC_DB.createCompanyWithAdmin({ company, admin });
-
-      // --- ID da empresa: mostrar grande + copiar + guardar
-      const companyId = createdCompany.company_code;
-
-      // 1) guardar no localStorage
-      localStorage.setItem("DC_ONE_LAST_COMPANY_ID", companyId);
-
-      // 2) preencher o campo de login automaticamente (para já ficar)
-      const loginCompanyInput = document.getElementById("loginCompanyId");
-      if (loginCompanyInput) loginCompanyInput.value = companyId;
-
-      // 3) mostrar modal fixo (não desaparece)
-      showCompanyIdModal(companyId);
-
-      // login imediato
-      const res = await DC_DB.login(createdCompany.company_code, admin.username, admin.pass);
-
-      const comp = res.profile.companies;
-      const modules = pickModulesForBranch(comp.branch);
-
-      DC_STATE.setSession({
-        isAuthed: true,
-        userId: res.authRes.user.id,
-        companyId: comp.id,
-        companyCode: comp.company_code,
-        username: res.profile.username,
-        role: res.profile.role,
-        plan: comp.plan,
-        branch: comp.branch,
-        companyName: comp.name
-      });
-
-      DC_STATE.setUI({
-        currentScreen: "app",
-        currentRoute: "dashboard",
-        modules
-      });
-
-      return true;
-    },
-
-    async loginFlow(companyCode, username, password) {
-      companyCode = sanitize(companyCode);
-      username = sanitize(username);
-      if (!companyCode || !username || !password) throw new Error("Preencha todos os campos do login.");
-
-      const res = await DC_DB.login(companyCode, username, password);
-      const comp = res.profile.companies;
-      const modules = pickModulesForBranch(comp.branch);
-
-      DC_STATE.setSession({
-        isAuthed: true,
-        userId: res.authRes.user.id,
-        companyId: comp.id,
-        companyCode: comp.company_code,
-        username: res.profile.username,
-        role: res.profile.role,
-        plan: comp.plan,
-        branch: comp.branch,
-        companyName: comp.name
-      });
-
-      DC_STATE.setUI({
-        currentScreen: "app",
-        currentRoute: "dashboard",
-        modules
-      });
-
-      DC_HELPERS.toast("Login com sucesso.", "ok");
-      return true;
-    },
-
-    async restoreSessionFlow() {
-      const restored = await DC_DB.restore();
-      if (!restored) return false;
-
-      const comp = restored.profile.companies;
-      const modules = pickModulesForBranch(comp.branch);
-
-      DC_STATE.setSession({
-        isAuthed: true,
-        userId: restored.profile.id,
-        companyId: comp.id,
-        companyCode: comp.company_code,
-        username: restored.profile.username,
-        role: restored.profile.role,
-        plan: comp.plan,
-        branch: comp.branch,
-        companyName: comp.name
-      });
-
-      DC_STATE.setUI({
-        currentScreen: "app",
-        currentRoute: "dashboard",
-        modules
-      });
-
-      return true;
-    },
-
-    async logoutFlow() {
-      await DC_DB.logout();
-      DC_STATE.resetSession();
-      DC_STATE.setUI({ currentScreen: "lock", currentRoute: "dashboard", modules: [] });
-      DC_HELPERS.toast("Sessão terminada.", "info");
-    }
-  };
-})();
-
 /* =========================
    STOCK - LÓGICA
 ========================= */
 const STOCK_LOGIC = (() => {
+  const sb = () => DC_DB.supabase; // supabase client
 
-  const sb = () => DC_DB.supabase; // ✅ supabase client certo
-
-  async function createStockOut({
-
-    company_id,
-    branch_id,
-    warehouse_id,
-    product_id,
-    qty,
-    note
-  }) {
+  async function createStockOut({ company_id, branch_id, warehouse_id, product_id, qty, note }) {
     // 1) Buscar produto
     const { data: product, error } = await sb()
       .from("products")
@@ -588,7 +426,6 @@ const STOCK_LOGIC = (() => {
     // 2) Produto simples
     if (product.product_type === "SIMPLE") {
       const { error: e2 } = await sb().from("stock_moves").insert({
-
         company_id,
         branch_id,
         warehouse_id,
@@ -603,7 +440,7 @@ const STOCK_LOGIC = (() => {
       return true;
     }
 
-    // 3) Produto BUNDLE (KIT)
+    // 3) Produto BUNDLE (KIT) -> expande em componentes
     const { data: components, error: e3 } = await sb()
       .from("product_components")
       .select("component_product_id, qty")
@@ -614,7 +451,7 @@ const STOCK_LOGIC = (() => {
       throw new Error("Este kit não possui componentes definidos.");
     }
 
-    const moves = components.map(c => ({
+    const moves = components.map((c) => ({
       company_id,
       branch_id,
       warehouse_id,
@@ -631,38 +468,404 @@ const STOCK_LOGIC = (() => {
 
     return true;
   }
-   async function createStockIn({
-  company_id,
-  branch_id,
-  warehouse_id,
-  product_id,
-  qty,
-  note
-}) {
-  const created_by = DC_STATE.state.session.userId || null;
 
-  const { error } = await sb().from("stock_moves").insert({
-    company_id,
-    branch_id,
-    warehouse_id,
-    product_id,
-    move_type: "IN",
-    qty,
-    ref_type: "manual",
-    ref_note: note || null,
-    created_by
-  });
-  if (error) throw error;
+  async function createStockIn({ company_id, branch_id, warehouse_id, product_id, qty, note }) {
+    const created_by = DC_STATE.state.session.userId || null;
 
-  return true;
-}
+    const { error } = await sb().from("stock_moves").insert({
+      company_id,
+      branch_id,
+      warehouse_id,
+      product_id,
+      move_type: "IN",
+      qty,
+      ref_type: "manual",
+      ref_note: note || null,
+      created_by
+    });
+    if (error) throw error;
 
+    return true;
+  }
 
-  return {
-    createStockOut,
-    createStockIn
-  };
+  return { createStockOut, createStockIn };
 })();
+
+/* =========================
+   STOCK - UI/CONTROLLER (dentro do DC_UI)
+   Cole estas funções dentro do bloco DC_UI (mesmo nível do initStockScreen)
+========================= */
+
+/** Atualiza o badge do menu "Stock" com a contagem de itens em stock baixo */
+const refreshLowStockBadge = async () => {
+  const el = document.getElementById("badgeLowStock");
+  if (!el) return;
+
+  try {
+    const sb = DC_DB.supabase;
+    const company_id = DC_STATE.state.session.companyId;
+    if (!company_id) return;
+
+    const { count, error } = await sb
+      .from("vw_stock_low")
+      .select("product_id", { count: "exact", head: true })
+      .eq("company_id", company_id);
+
+    if (error) throw error;
+
+    const n = Number(count || 0);
+    el.textContent = n;
+    el.style.display = n > 0 ? "inline-flex" : "none";
+  } catch {
+    el.style.display = "none";
+  }
+};
+
+/** Abre modal com lista de alertas (vw_stock_low) */
+const openLowStockModal = async () => {
+  const old = document.getElementById("dcLowStockModal");
+  if (old) old.remove();
+
+  const overlay = document.createElement("div");
+  overlay.id = "dcLowStockModal";
+  overlay.style.cssText = `
+    position:fixed;inset:0;background:rgba(0,0,0,.55);
+    display:flex;align-items:center;justify-content:center;
+    z-index:999999;padding:18px;
+  `;
+
+  const box = document.createElement("div");
+  box.style.cssText = `
+    width:min(860px, 100%); background:#fff; border-radius:18px;
+    padding:16px 16px 12px; box-shadow:0 20px 60px rgba(0,0,0,.25);
+    border:1px solid rgba(0,0,0,.08); max-height:80vh; overflow:auto;
+  `;
+
+  box.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+      <div style="font-weight:950;font-size:16px">⚠️ Stock baixo</div>
+      <button id="dcCloseLowStock" style="border:none;background:transparent;font-size:18px;font-weight:900;cursor:pointer">✕</button>
+    </div>
+    <p class="muted small" style="margin:8px 0 10px">
+      Itens com quantidade disponível menor ou igual ao mínimo definido.
+    </p>
+    <div id="dcLowStockBody" class="muted small" style="padding:10px 0">A carregar…</div>
+  `;
+
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+
+  const close = () => overlay.remove();
+  document.getElementById("dcCloseLowStock")?.addEventListener("click", close);
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
+
+  try {
+    const sb = DC_DB.supabase;
+    const company_id = DC_STATE.state.session.companyId;
+
+    const { data: rows, error } = await sb
+      .from("vw_stock_low")
+      .select("*")
+      .eq("company_id", company_id);
+
+    if (error) throw error;
+
+    const list = rows || [];
+    const body = document.getElementById("dcLowStockBody");
+    if (!body) return;
+
+    if (!list.length) {
+      body.innerHTML = `<div style="padding:10px 0;font-weight:800">✅ Sem alertas no momento.</div>`;
+      return;
+    }
+
+    // map armazéns
+    const whIds = Array.from(new Set(list.map(r => r.warehouse_id).filter(Boolean)));
+    let whMap = {};
+    if (whIds.length) {
+      const { data: whs, error: we } = await sb
+        .from("warehouses")
+        .select("id,name")
+        .in("id", whIds);
+      if (!we && whs) whMap = Object.fromEntries(whs.map(w => [w.id, w.name]));
+    }
+
+    // map produtos (caso a view não traga product_name/unit)
+    const hasProductName = list.some(r => ("product_name" in r) || ("products" in r));
+    let prodMap = {};
+    if (!hasProductName) {
+      const pIds = Array.from(new Set(list.map(r => r.product_id).filter(Boolean)));
+      if (pIds.length) {
+        const { data: ps, error: pe } = await sb
+          .from("products")
+          .select("id,name,unit")
+          .in("id", pIds);
+        if (!pe && ps) prodMap = Object.fromEntries(ps.map(p => [p.id, { name: p.name, unit: p.unit }]));
+      }
+    }
+
+    const fmt = (n) => Number(n || 0).toLocaleString();
+
+    body.innerHTML = `
+      <div style="overflow:auto">
+        <table style="width:100%;border-collapse:collapse">
+          <thead>
+            <tr>
+              <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(0,0,0,.08)">Produto</th>
+              <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(0,0,0,.08)">Armazém</th>
+              <th style="text-align:right;padding:10px;border-bottom:1px solid rgba(0,0,0,.08)">Disponível</th>
+              <th style="text-align:right;padding:10px;border-bottom:1px solid rgba(0,0,0,.08)">Mínimo</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${list.map(r => {
+              const whName =
+                whMap[r.warehouse_id] || r.warehouse_id || "—";
+
+              // suporte a vários formatos de view:
+              const pName =
+                r.product_name ||
+                r.products?.name ||
+                prodMap[r.product_id]?.name ||
+                r.product_id ||
+                "—";
+
+              const unit =
+                r.unit ||
+                r.products?.unit ||
+                prodMap[r.product_id]?.unit ||
+                "";
+
+              return `
+                <tr>
+                  <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);font-weight:900">
+                    ${pName} <span class="muted small" style="font-weight:800">${unit ? `(${unit})` : ""}</span>
+                  </td>
+                  <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06)">${whName}</td>
+                  <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);text-align:right;font-weight:900">
+                    ${fmt(r.on_hand ?? r.qty_on_hand ?? 0)}
+                  </td>
+                  <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);text-align:right;font-weight:900">
+                    ${fmt(r.min_qty ?? r.min ?? 0)}
+                  </td>
+                </tr>
+              `;
+            }).join("")}
+          </tbody>
+        </table>
+      </div>
+    `;
+  } catch (err) {
+    const body = document.getElementById("dcLowStockBody");
+    if (body) body.innerHTML = `<div style="padding:10px 0;color:#b91c1c;font-weight:900">❌ ${err?.message || err}</div>`;
+  }
+};
+
+/** Inicializa toda a tela Stock (IN/OUT/Saldo/Transferência + alertas) */
+const initStockScreen = async () => {
+  const route = DC_STATE.state.ui.currentRoute;
+  if (route !== "stock") return;
+
+  const sb = DC_DB.supabase;
+  const company_id = DC_STATE.state.session.companyId;
+
+  // pegar 1 branch (MVP)
+  const { data: branches, error: be } = await sb
+    .from("branches")
+    .select("id")
+    .eq("company_id", company_id)
+    .order("created_at", { ascending: true })
+    .limit(1);
+  if (be) throw be;
+
+  const branch_id = branches?.[0]?.id;
+  if (!branch_id) throw new Error("Crie uma filial (branches) para continuar.");
+
+  // carregar produtos e armazéns
+  const { data: products, error: pe } = await sb
+    .from("products")
+    .select("id,name,product_type")
+    .eq("company_id", company_id)
+    .order("name");
+  if (pe) throw pe;
+
+  const { data: whs, error: we } = await sb
+    .from("warehouses")
+    .select("id,name")
+    .eq("company_id", company_id)
+    .eq("branch_id", branch_id)
+    .order("name");
+  if (we) throw we;
+
+  // preencher selects
+  const fill = (el, html) => { if (el) el.innerHTML = html; };
+  const prodHtml = (products || [])
+    .map(p => `<option value="${p.id}">${p.name} (${p.product_type})</option>`)
+    .join("");
+  const whHtml = (whs || [])
+    .map(w => `<option value="${w.id}">${w.name}</option>`)
+    .join("");
+
+  fill(document.getElementById("inProduct"), prodHtml);
+  fill(document.getElementById("outProduct"), prodHtml);
+  fill(document.getElementById("inWarehouse"), whHtml);
+  fill(document.getElementById("outWarehouse"), whHtml);
+
+  fill(document.getElementById("trProduct"), prodHtml);
+  fill(document.getElementById("trFromWarehouse"), whHtml);
+  fill(document.getElementById("trToWarehouse"), whHtml);
+
+  // clique no badge abre modal
+  document.getElementById("badgeLowStock")?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    openLowStockModal();
+  });
+
+  // ENTRADA
+  document.getElementById("stockInForm")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    try {
+      await STOCK_LOGIC.createStockIn({
+        company_id,
+        branch_id,
+        warehouse_id: document.getElementById("inWarehouse").value,
+        product_id: document.getElementById("inProduct").value,
+        qty: Number(document.getElementById("inQty").value),
+        note: document.getElementById("inNote").value
+      });
+      document.getElementById("inMsg").textContent = "✅ Entrada registada.";
+      DC_HELPERS.toast("Entrada registada!", "ok");
+      await refreshLowStockBadge();
+      document.getElementById("btnRefreshBalances")?.click();
+    } catch (err) {
+      document.getElementById("inMsg").textContent = "❌ " + (err?.message || err);
+      DC_HELPERS.toast(err?.message || "Erro", "err");
+    }
+  });
+
+  // SAÍDA
+  document.getElementById("stockOutForm")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    try {
+      await STOCK_LOGIC.createStockOut({
+        company_id,
+        branch_id,
+        warehouse_id: document.getElementById("outWarehouse").value,
+        product_id: document.getElementById("outProduct").value,
+        qty: Number(document.getElementById("outQty").value),
+        note: document.getElementById("outNote").value
+      });
+      document.getElementById("outMsg").textContent = "✅ Saída registada.";
+      DC_HELPERS.toast("Saída registada!", "ok");
+      await refreshLowStockBadge();
+      document.getElementById("btnRefreshBalances")?.click();
+    } catch (err) {
+      document.getElementById("outMsg").textContent = "❌ " + (err?.message || err);
+      DC_HELPERS.toast(err?.message || "Erro", "err");
+    }
+  });
+
+  // TRANSFERÊNCIA (RPC)
+  document.getElementById("stockTransferForm")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    try {
+      const fromW = document.getElementById("trFromWarehouse").value;
+      const toW = document.getElementById("trToWarehouse").value;
+
+      if (fromW === toW) throw new Error("Origem e destino não podem ser o mesmo armazém.");
+
+      await DC_DB.transferStock({
+        company_id,
+        branch_id,
+        from_warehouse_id: fromW,
+        to_warehouse_id: toW,
+        product_id: document.getElementById("trProduct").value,
+        qty: Number(document.getElementById("trQty").value),
+        ref_note: document.getElementById("trNote").value || "Transferência interna"
+      });
+
+      document.getElementById("trMsg").textContent = "✅ Transferência registada.";
+      DC_HELPERS.toast("Transferência registada!", "ok");
+      await refreshLowStockBadge();
+
+      // recarrega saldos
+      document.getElementById("btnRefreshBalances")?.click();
+    } catch (err) {
+      document.getElementById("trMsg").textContent = "❌ " + (err?.message || err);
+      DC_HELPERS.toast(err?.message || "Erro", "err");
+    }
+  });
+
+  // ===== SALDO POR ARMAZÉM =====
+  const balWhSel = document.getElementById("balWarehouse");
+  const balBody = document.getElementById("balBody");
+  const balMsg = document.getElementById("balMsg");
+
+  if (balWhSel) {
+    balWhSel.innerHTML = (whs || []).map(w => `<option value="${w.id}">${w.name}</option>`).join("");
+
+    const renderBalances = async () => {
+      try {
+        const warehouse_id = balWhSel.value;
+        if (!warehouse_id) {
+          balBody.innerHTML = `<tr><td style="padding:10px" colspan="3">Nenhum armazém.</td></tr>`;
+          return;
+        }
+
+        balMsg.textContent = "A carregar saldos…";
+
+        const { data: rows, error } = await sb
+          .from("stock_balances")
+          .select("qty_on_hand, product_id, products(name, unit)")
+          .eq("company_id", company_id)
+          .eq("warehouse_id", warehouse_id)
+          .order("updated_at", { ascending: false });
+
+        if (error) throw error;
+
+        const list = rows || [];
+        if (!list.length) {
+          balBody.innerHTML = `<tr><td class="muted small" style="padding:10px" colspan="3">Sem registos de saldo ainda.</td></tr>`;
+          balMsg.textContent = "";
+          return;
+        }
+
+        balBody.innerHTML = list.map(r => `
+          <tr>
+            <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06)">${r.products?.name || "—"}</td>
+            <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06)">${r.products?.unit || "un"}</td>
+            <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);text-align:right;font-weight:900">
+              ${Number(r.qty_on_hand || 0).toLocaleString()}
+            </td>
+          </tr>
+        `).join("");
+
+        balMsg.textContent = "";
+      } catch (err) {
+        balMsg.textContent = "❌ " + (err?.message || err);
+      }
+    };
+
+    await renderBalances();
+    balWhSel.addEventListener("change", () => renderBalances());
+    document.getElementById("btnRefreshBalances")?.addEventListener("click", () => renderBalances());
+  }
+
+  // aviso (opcional) ao abrir
+  const low = await sb
+    .from("vw_stock_low")
+    .select("product_id", { count: "exact" })
+    .eq("company_id", company_id);
+
+  if (!low.error && Number(low.count || 0) > 0) {
+    DC_HELPERS.toast(`⚠️ Stock baixo: ${low.count} itens`, "warn");
+  }
+
+  // garante badge atualizado ao abrir
+  await refreshLowStockBadge();
+};
+
+
 
 
 
