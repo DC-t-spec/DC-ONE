@@ -346,7 +346,7 @@
         });
         if (error) throw error;
         return data;
-      }
+      },
        async createSale({ company_id, branch_id, warehouse_id, items, ref_note }) {
   const created_by = DC_STATE.state.session.userId || null;
 
@@ -1228,7 +1228,7 @@ async createCashMove({ company_id, branch_id, account_id, move_type, amount, ref
   });
 
   // finalizar
-  document.getElementById("posCheckout")?.addEventListener("click", async () => {
+bindOnce(document.getElementById("posCheckout"), "posCheckout", "click", async () => {
     try {
       $msg.textContent = "A finalizar…";
 
@@ -1579,9 +1579,10 @@ async createCashMove({ company_id, branch_id, account_id, move_type, amount, ref
         setHeader(u.currentRoute);
 
         renderRoute(u.currentRoute);
-         if (u.currentRoute === "sales") {
-  setTimeout(() => DC_UI.initSalesScreen(), 0);
+    if (u.currentRoute === "sales") {
+  setTimeout(() => DC_UI.stock.initSalesScreen(), 0);
 }
+
 
 
         // badge sempre atual
@@ -1681,9 +1682,10 @@ async createCashMove({ company_id, branch_id, account_id, move_type, amount, ref
           DC_UI.highlightRoute(route);
           DC_UI.setHeader(route);
           DC_UI.renderRoute(route);
-           if (route === "sales") {
-  DC_UI.initSalesScreen();
+  if (route === "sales") {
+  DC_UI.stock.initSalesScreen();
 }
+
 
 
           // badge sempre
