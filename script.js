@@ -837,13 +837,31 @@ async createCashMove({ company_id, branch_id, account_id, move_type, amount, ref
           .order("name");
         if (pe) throw pe;
 
-        const { data: whs, error: we } = await sb
-          .from("warehouses")
-          .select("id,name")
-          .eq("company_id", company_id)
-          .eq("branch_id", branch_id)
-          .order("name");
-        if (we) throw we;
+       let whs = [];
+{
+  const r1 = await sb
+    .from("warehouses")
+    .select("id,name")
+    .eq("company_id", company_id)
+    .eq("branch_id", branch_id)
+    .order("name");
+
+  if (r1.error) throw r1.error;
+  whs = r1.data || [];
+
+  // fallback: se não encontrou por branch_id, tenta só por company_id
+  if (!whs.length) {
+    const r2 = await sb
+      .from("warehouses")
+      .select("id,name")
+      .eq("company_id", company_id)
+      .order("name");
+
+    if (r2.error) throw r2.error;
+    whs = r2.data || [];
+  }
+}
+
 
         const prodHtml = (products || []).map(p => `<option value="${p.id}">${p.name} (${p.product_type})</option>`).join("");
         const whHtml = (whs || []).map(w => `<option value="${w.id}">${w.name}</option>`).join("");
@@ -1113,13 +1131,16 @@ clientQ?.addEventListener("input", (e) => {
 
 
   // 4) produtos
-  const { data: products, error: pe } = await sb
-    .from("products")
-    .select("id, name, unit, product_type, price, min_qty")
-    .eq("company_id", company_id)
-    .eq("is_active", true)
-    .order("name");
-  if (pe) throw pe;
+ const { data: productsRaw, error: pe } = await sb
+  .from("products")
+  .select("id, name, unit, product_type, price, min_qty, is_active")
+  .eq("company_id", company_id)
+  .order("name");
+if (pe) throw pe;
+
+// considera ativo tudo que não for false
+const products = (productsRaw || []).filter(p => p.is_active !== false);
+
 
   // === estado do POS (em memória) ===
   const cart = new Map(); // product_id -> {product, qty, price}
