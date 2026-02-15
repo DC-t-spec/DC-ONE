@@ -395,7 +395,7 @@ async createCashMove({ company_id, branch_id, account_id, move_type, amount, ref
 async listClients(company_id, { include_inactive = false } = {}) {
   let q = supabase
     .from("clients")
-    .select("id,name,phone,email,address,is_active,created_at")
+  .select("id,name,phone,email,is_active,created_at")
     .eq("company_id", company_id)
     .order("name");
 
@@ -416,11 +416,11 @@ async createClient({ company_id, name, phone, email, address }) {
       name,
       phone: phone || null,
       email: email || null,
-      address: address || null,
       is_active: true,
       created_by
     })
-    .select("id,name,phone,email,address,is_active,created_at")
+   .select("id,name,phone,email,is_active,created_at")
+
     .single();
 
   if (error) throw error;
@@ -434,11 +434,10 @@ async updateClient({ company_id, id, name, phone, email, address }) {
       name,
       phone: phone || null,
       email: email || null,
-      address: address || null
     })
     .eq("company_id", company_id)
     .eq("id", id)
-    .select("id,name,phone,email,address,is_active,created_at")
+   .select("id,name,phone,email,is_active,created_at")
     .single();
 
   if (error) throw error;
