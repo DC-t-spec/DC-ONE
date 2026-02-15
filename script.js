@@ -389,6 +389,72 @@ async createCashMove({ company_id, branch_id, account_id, move_type, amount, ref
   if (error) throw error;
   return true;
 },
+// =====================
+// CLIENTES (CRUD)
+// =====================
+async listClients(company_id, { include_inactive = false } = {}) {
+  let q = supabase
+    .from("clients")
+    .select("id,name,phone,email,address,is_active,created_at")
+    .eq("company_id", company_id)
+    .order("name");
+
+  if (!include_inactive) q = q.eq("is_active", true);
+
+  const { data, error } = await q;
+  if (error) throw error;
+  return data || [];
+},
+
+async createClient({ company_id, name, phone, email, address }) {
+  const created_by = DC_STATE.state.session.userId || null;
+
+  const { data, error } = await supabase
+    .from("clients")
+    .insert({
+      company_id,
+      name,
+      phone: phone || null,
+      email: email || null,
+      address: address || null,
+      is_active: true,
+      created_by
+    })
+    .select("id,name,phone,email,address,is_active,created_at")
+    .single();
+
+  if (error) throw error;
+  return data;
+},
+
+async updateClient({ company_id, id, name, phone, email, address }) {
+  const { data, error } = await supabase
+    .from("clients")
+    .update({
+      name,
+      phone: phone || null,
+      email: email || null,
+      address: address || null
+    })
+    .eq("company_id", company_id)
+    .eq("id", id)
+    .select("id,name,phone,email,address,is_active,created_at")
+    .single();
+
+  if (error) throw error;
+  return data;
+},
+
+async setClientActive({ company_id, id, is_active }) {
+  const { error } = await supabase
+    .from("clients")
+    .update({ is_active: !!is_active })
+    .eq("company_id", company_id)
+    .eq("id", id);
+
+  if (error) throw error;
+  return true;
+},
 
     };
 
@@ -1417,6 +1483,253 @@ const STOCK_UI = (() => {
     renderCart();
     await refreshLowStockBadge();
   };
+/* =========================
+   CLIENTS_UI
+========================= */
+const CLIENTS_UI = (() => {
+  function bindOnce(el, key, eventName, handler) {
+    if (!el) return;
+    const k = `bound_${key}_${eventName}`;
+    if (el.dataset[k] === "1") return;
+    el.dataset[k] = "1";
+    el.addEventListener(eventName, handler);
+  }
+
+  const openClientModal = ({ mode, client }) => {
+    const old = document.getElementById("dcClientModal");
+    if (old) old.remove();
+
+    const overlay = document.createElement("div");
+    overlay.id = "dcClientModal";
+    overlay.style.cssText = `
+      position:fixed;inset:0;background:rgba(0,0,0,.55);
+      display:flex;align-items:center;justify-content:center;
+      z-index:999999;padding:18px;
+    `;
+
+    const box = document.createElement("div");
+    box.style.cssText = `
+      width:min(560px, 100%); background:#fff; border-radius:18px;
+      padding:16px 16px 12px; box-shadow:0 20px 60px rgba(0,0,0,.25);
+      border:1px solid rgba(0,0,0,.08);
+    `;
+
+    const title = mode === "edit" ? "Editar Cliente" : "Novo Cliente";
+
+    box.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+        <div style="font-weight:950;font-size:16px">👤 ${title}</div>
+        <button id="dcCloseClient" style="border:none;background:transparent;font-size:18px;font-weight:900;cursor:pointer">✕</button>
+      </div>
+
+      <div class="divider" style="margin:12px 0"></div>
+
+      <form id="cliForm" style="display:grid;gap:10px">
+        <input id="cliName" placeholder="Nome *" value="${client?.name || ""}"
+          style="width:100%;padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12)"/>
+        <input id="cliPhone" placeholder="Telefone" value="${client?.phone || ""}"
+          style="width:100%;padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12)"/>
+        <input id="cliEmail" placeholder="Email" value="${client?.email || ""}"
+          style="width:100%;padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12)"/>
+        <input id="cliAddress" placeholder="Endereço" value="${client?.address || ""}"
+          style="width:100%;padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12)"/>
+
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px">
+          <button type="submit" id="cliSave"
+            style="flex:1;min-width:180px;padding:12px 14px;border-radius:14px;
+              border:1px solid rgba(0,0,0,.12); background:#0ea5e9;color:#fff;font-weight:900;cursor:pointer">
+            Guardar
+          </button>
+
+          <button type="button" id="cliCancel"
+            style="flex:1;min-width:180px;padding:12px 14px;border-radius:14px;
+              border:1px solid rgba(0,0,0,.12); background:#fff;font-weight:900;cursor:pointer">
+            Cancelar
+          </button>
+        </div>
+
+        <p id="cliFormMsg" class="muted small" style="margin:6px 0 0"></p>
+      </form>
+    `;
+
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+
+    const close = () => overlay.remove();
+    document.getElementById("dcCloseClient")?.addEventListener("click", close);
+    document.getElementById("cliCancel")?.addEventListener("click", close);
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
+
+    return { overlay, close };
+  };
+
+  const initClientsScreen = async () => {
+    if (DC_STATE.state.ui.currentRoute !== "clients") return;
+
+    const company_id = DC_STATE.state.session.companyId;
+    if (!company_id) return;
+
+    const body = document.getElementById("cliBody");
+    const msg  = document.getElementById("cliMsg");
+    const qInp = document.getElementById("cliSearch");
+    const showInactive = document.getElementById("cliShowInactive");
+
+    let cache = [];
+
+    const matches = (c, q) => {
+      q = String(q || "").trim().toLowerCase();
+      if (!q) return true;
+      return (
+        String(c.name || "").toLowerCase().includes(q) ||
+        String(c.phone || "").toLowerCase().includes(q) ||
+        String(c.email || "").toLowerCase().includes(q)
+      );
+    };
+
+    const render = () => {
+      const q = qInp?.value || "";
+      const list = (cache || []).filter(c => matches(c, q));
+
+      if (!body) return;
+      if (!list.length) {
+        body.innerHTML = `<tr><td class="muted small" style="padding:10px" colspan="5">Sem clientes.</td></tr>`;
+        return;
+      }
+
+      body.innerHTML = list.map(c => `
+        <tr>
+          <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);font-weight:900">${c.name || "—"}</td>
+          <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06)">${c.phone || "—"}</td>
+          <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06)">${c.email || "—"}</td>
+          <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);font-weight:900">
+            ${c.is_active ? "✅ Ativo" : "⛔ Inativo"}
+          </td>
+          <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);text-align:right">
+            <button data-edit="${c.id}" type="button"
+              style="padding:8px 10px;border-radius:10px;border:1px solid rgba(0,0,0,.12);font-weight:900;cursor:pointer">
+              Editar
+            </button>
+            <button data-toggle="${c.id}" type="button"
+              style="margin-left:8px;padding:8px 10px;border-radius:10px;border:1px solid rgba(0,0,0,.12);font-weight:900;cursor:pointer">
+              ${c.is_active ? "Desativar" : "Ativar"}
+            </button>
+          </td>
+        </tr>
+      `).join("");
+
+      // binds por render (ok)
+      body.querySelectorAll("[data-edit]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const id = btn.getAttribute("data-edit");
+          const client = cache.find(x => x.id === id);
+          if (!client) return;
+
+          const { close } = openClientModal({ mode: "edit", client });
+
+          document.getElementById("cliForm")?.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const fm = document.getElementById("cliFormMsg");
+
+            try {
+              const name = (document.getElementById("cliName")?.value || "").trim();
+              if (!name) throw new Error("Nome é obrigatório.");
+
+              fm.textContent = "A guardar…";
+
+              await DC_DB.updateClient({
+                company_id,
+                id: client.id,
+                name,
+                phone: (document.getElementById("cliPhone")?.value || "").trim(),
+                email: (document.getElementById("cliEmail")?.value || "").trim(),
+                address: (document.getElementById("cliAddress")?.value || "").trim()
+              });
+
+              close();
+              await load();
+              DC_HELPERS.toast("Cliente atualizado!", "ok");
+            } catch (err) {
+              fm.textContent = "❌ " + (err?.message || err);
+              DC_HELPERS.toast(err?.message || "Erro", "err");
+            }
+          }, { once: true });
+        });
+      });
+
+      body.querySelectorAll("[data-toggle]").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const id = btn.getAttribute("data-toggle");
+          const client = cache.find(x => x.id === id);
+          if (!client) return;
+
+          try {
+            await DC_DB.setClientActive({ company_id, id, is_active: !client.is_active });
+            await load();
+            DC_HELPERS.toast(client.is_active ? "Cliente desativado." : "Cliente ativado.", "info");
+          } catch (err) {
+            DC_HELPERS.toast(err?.message || "Erro", "err");
+          }
+        });
+      });
+    };
+
+    const load = async () => {
+      try {
+        if (msg) msg.textContent = "A carregar…";
+        const include_inactive = !!showInactive?.checked;
+
+        // se include_inactive=true, traz tudo; senão só ativos
+        cache = await DC_DB.listClients(company_id, { include_inactive });
+
+        if (msg) msg.textContent = "";
+        render();
+      } catch (err) {
+        if (msg) msg.textContent = "❌ " + (err?.message || err);
+        if (body) body.innerHTML = `<tr><td style="padding:10px" colspan="5">Erro ao carregar.</td></tr>`;
+      }
+    };
+
+    // binds 1x
+    bindOnce(document.getElementById("cliRefresh"), "cliRefresh", "click", () => load());
+    bindOnce(qInp, "cliSearch", "input", () => render());
+    bindOnce(showInactive, "cliShowInactive", "change", () => load());
+
+    bindOnce(document.getElementById("cliNew"), "cliNew", "click", () => {
+      const { close } = openClientModal({ mode: "new", client: null });
+
+      document.getElementById("cliForm")?.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const fm = document.getElementById("cliFormMsg");
+
+        try {
+          const name = (document.getElementById("cliName")?.value || "").trim();
+          if (!name) throw new Error("Nome é obrigatório.");
+
+          fm.textContent = "A guardar…";
+
+          await DC_DB.createClient({
+            company_id,
+            name,
+            phone: (document.getElementById("cliPhone")?.value || "").trim(),
+            email: (document.getElementById("cliEmail")?.value || "").trim(),
+            address: (document.getElementById("cliAddress")?.value || "").trim()
+          });
+
+          close();
+          await load();
+          DC_HELPERS.toast("Cliente criado!", "ok");
+        } catch (err) {
+          fm.textContent = "❌ " + (err?.message || err);
+          DC_HELPERS.toast(err?.message || "Erro", "err");
+        }
+      }, { once: true });
+    });
+
+    await load();
+  };
+
+  return { initClientsScreen };
+})();
 
   return { refreshLowStockBadge, openLowStockModal, initStockScreen, initSalesScreen };
 })();
@@ -1644,7 +1957,63 @@ const STOCK_UI = (() => {
           </div>
         `,
         cash: `<div class="card"><h2 class="subtitle">Caixa</h2><p class="muted">Entradas, saídas e saldo.</p></div>`,
-        clients: `<div class="card"><h2 class="subtitle">Clientes</h2><p class="muted">Cadastro e histórico.</p></div>`,
+       clients: `
+  <div class="card">
+    <h2 class="subtitle">Clientes</h2>
+    <p class="muted">Crie, pesquise e edite clientes. (Pagamento parcial no POS exige cliente.)</p>
+    <div class="divider"></div>
+
+    <div class="grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px">
+      <div class="card" style="padding:12px">
+        <div class="subtitle subtitle--sm">Pesquisar</div>
+        <input id="cliSearch" placeholder="Nome / Telefone / Email"
+          style="width:100%;padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12);margin-top:8px"/>
+        <label class="muted small" style="display:flex;gap:10px;align-items:center;margin-top:10px;font-weight:800">
+          <input id="cliShowInactive" type="checkbox"/>
+          Mostrar inativos
+        </label>
+      </div>
+
+      <div class="card" style="padding:12px">
+        <div class="subtitle subtitle--sm">Ações</div>
+        <button id="cliNew" type="button"
+          style="margin-top:8px;padding:12px 14px;border-radius:14px;border:1px solid rgba(0,0,0,.12);font-weight:900;cursor:pointer">
+          + Novo Cliente
+        </button>
+
+        <button id="cliRefresh" type="button"
+          style="margin-top:10px;padding:10px 12px;border-radius:12px;border:1px solid rgba(0,0,0,.12);font-weight:900;cursor:pointer">
+          Atualizar Lista
+        </button>
+
+        <p id="cliMsg" class="muted small" style="margin-top:10px"></p>
+      </div>
+    </div>
+
+    <div class="card" style="padding:12px;margin-top:12px">
+      <div class="subtitle subtitle--sm">Lista</div>
+      <div class="divider"></div>
+
+      <div style="overflow:auto">
+        <table style="width:100%;border-collapse:collapse">
+          <thead>
+            <tr>
+              <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(0,0,0,.08)">Nome</th>
+              <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(0,0,0,.08)">Telefone</th>
+              <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(0,0,0,.08)">Email</th>
+              <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(0,0,0,.08)">Estado</th>
+              <th style="text-align:right;padding:10px;border-bottom:1px solid rgba(0,0,0,.08)"></th>
+            </tr>
+          </thead>
+          <tbody id="cliBody">
+            <tr><td class="muted small" style="padding:10px" colspan="5">Carregando…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+`,
+
         suppliers: `<div class="card"><h2 class="subtitle">Fornecedores</h2><p class="muted">Compras e pagamentos.</p></div>`,
         settings: `<div class="card"><h2 class="subtitle">Configurações</h2><p class="muted">Empresa e utilizadores.</p></div>`,
         bookings: `<div class="card"><h2 class="subtitle">Reservas</h2><p class="muted">Salas/estúdios/co-work.</p></div>`,
@@ -1729,6 +2098,10 @@ if (u.currentRoute === "sales") {
         if (u.currentRoute === "stock") {
           setTimeout(() => STOCK_UI.initStockScreen(), 0);
         }
+         if (u.currentRoute === "clients") {
+  setTimeout(() => CLIENTS_UI.initClientsScreen(), 0);
+}
+
       }
     };
 
@@ -1829,6 +2202,8 @@ if (u.currentRoute === "sales") {
           // init stock ao entrar
           if (route === "stock") DC_UI.stock.initStockScreen();
            if (route === "sales") DC_UI.stock.initSalesScreen();
+           if (route === "clients") CLIENTS_UI.initClientsScreen();
+
 
         });
       });
