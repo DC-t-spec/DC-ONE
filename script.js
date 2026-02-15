@@ -1018,6 +1018,7 @@ async createCashMove({ company_id, branch_id, account_id, move_type, amount, ref
 
   const sb = DC_DB.supabase;
   const company_id = DC_STATE.state.session.companyId;
+  if (!company_id) return;
 
   // 1) branch MVP (primeira)
   const { data: branches, error: be } = await sb
@@ -1031,119 +1032,104 @@ async createCashMove({ company_id, branch_id, account_id, move_type, amount, ref
   const branch_id = branches?.[0]?.id;
   if (!branch_id) throw new Error("Crie uma filial (branches) para continuar.");
 
-  // 2) armazéns da branch (MVP: escolhe na UI mas é “fixo” para a venda)
-  const { data: whs, error: we } = await sb
-    .from("warehouses")
-    .select("id,name")
-    .eq("company_id", company_id)
-    .eq("branch_id", branch_id)
-    .order("name");
-  if (we) throw we;
+  // 2) armazéns (primeiro tenta por branch, se vier vazio tenta por company)
+  let whs = [];
+  {
+    const r1 = await sb
+      .from("warehouses")
+      .select("id,name")
+      .eq("company_id", company_id)
+      .eq("branch_id", branch_id)
+      .order("name");
+    if (r1.error) throw r1.error;
+    whs = r1.data || [];
+
+    if (!whs.length) {
+      const r2 = await sb
+        .from("warehouses")
+        .select("id,name")
+        .eq("company_id", company_id)
+        .order("name");
+      if (r2.error) throw r2.error;
+      whs = r2.data || [];
+    }
+  }
 
   const whSel = document.getElementById("posWarehouse");
   const whHint = document.getElementById("posWarehouseHint");
   if (!whSel) return;
 
-  if (!whs?.length) {
+  if (!whs.length) {
     whSel.innerHTML = "";
     if (whHint) whHint.textContent = "❌ Crie um armazém para vender.";
     return;
   }
 
   whSel.innerHTML = whs.map(w => `<option value="${w.id}">${w.name}</option>`).join("");
-  if (whHint) whHint.textContent = "MVP: vais vender usando o armazém selecionado acima.";
-       
+  if (whHint) whHint.textContent = "Vender a partir do armazém selecionado.";
 
-  // 3) contas (banco/caixa/etc.)
+  // 3) clientes (UMA VEZ SÓ)
+  const clientSel  = document.getElementById("posClient");
+  const clientQ    = document.getElementById("posClientSearch");
+  const clientHint = document.getElementById("posClientHint");
+
+  let clients = [];
+  if (clientSel) {
+    const { data, error } = await sb
+      .from("clients")
+      .select("id,name,phone")
+      .eq("company_id", company_id)
+      .order("name");
+    if (!error) clients = data || [];
+
+    const renderClients = (filterText = "") => {
+      const q = String(filterText || "").trim().toLowerCase();
+      const list = (clients || []).filter(c => {
+        const name = String(c.name || "").toLowerCase();
+        const phone = String(c.phone || "").toLowerCase();
+        return !q || name.includes(q) || phone.includes(q);
+      });
+
+      clientSel.innerHTML =
+        `<option value="">— Selecionar cliente —</option>` +
+        list.map(c => {
+          const label = `${c.name}${c.phone ? ` • ${c.phone}` : ""}`;
+          return `<option value="${c.id}">${label}</option>`;
+        }).join("");
+
+      if (clientHint) clientHint.textContent =
+        "Pagamento parcial cria dívida ligada ao cliente.";
+    };
+
+    renderClients("");
+    clientQ?.addEventListener("input", (e) => renderClients(e.target.value));
+  }
+
+  // 4) contas (cash_accounts) (se vier vazio, ok)
   const accSel = document.getElementById("posAccount");
   if (accSel) {
     try {
       const accs = await DC_DB.listCashAccounts(company_id);
-      accSel.innerHTML = `<option value="">— Não movimentar —</option>` + accs.map(a => {
-        const label = `${a.name} (${a.type})`;
-        return `<option value="${a.id}">${label}</option>`;
-      }).join("");
+      accSel.innerHTML =
+        `<option value="">— Não movimentar —</option>` +
+        accs.map(a => `<option value="${a.id}">${a.name} (${a.type})</option>`).join("");
     } catch {
       accSel.innerHTML = `<option value="">— Não movimentar —</option>`;
     }
   }
-          // ===== CLIENTES =====
-const clientSel  = document.getElementById("posClient");
-const clientQ    = document.getElementById("posClientSearch");
-const clientHint = document.getElementById("posClientHint");
 
-const loadClients = async () => {
-  // Ajusta os campos conforme a tua tabela:
-  // aqui eu assumo que tens: id, name, phone (se não tiver phone, remove do select)
-  const { data, error } = await sb
-    .from("clients")
-    .select("id, name, phone")
+  // 5) produtos (remove filtro is_active para não “sumir” produto)
+  const { data: products, error: pe } = await sb
+    .from("products")
+    .select("id, name, unit, product_type, price, min_qty, is_active")
     .eq("company_id", company_id)
     .order("name");
+  if (pe) throw pe;
 
-  if (error) throw error;
-  return data || [];
-};
+  const activeProducts = (products || []).filter(p => p.is_active !== false);
 
-let clients = [];
-try {
-  clients = await loadClients();
-} catch (e) {
-  clients = [];
-  if (clientHint) clientHint.textContent = "❌ Não foi possível carregar clientes.";
-}
-
-const renderClients = (filterText = "") => {
-  if (!clientSel) return;
-
-  const q = String(filterText || "").trim().toLowerCase();
-
-  const list = (clients || []).filter(c => {
-    const name = String(c.name || "").toLowerCase();
-    const phone = String(c.phone || "").toLowerCase();
-    return !q || name.includes(q) || phone.includes(q);
-  });
-
-  if (!list.length) {
-    clientSel.innerHTML = `<option value="">— Sem clientes —</option>`;
-    if (clientHint) clientHint.textContent = "Crie clientes em Clientes para poder vender com dívida.";
-    return;
-  }
-
-  // Se quiseres OBRIGAR cliente, remove a primeira opção vazia
-  clientSel.innerHTML =
-    `<option value="">— Selecionar cliente —</option>` +
-    list.map(c => {
-      const label = `${c.name}${c.phone ? ` • ${c.phone}` : ""}`;
-      return `<option value="${c.id}">${label}</option>`;
-    }).join("");
-
-  if (clientHint) clientHint.textContent = "Pagamento parcial cria dívida ligada ao cliente.";
-};
-
-// primeira renderização
-renderClients("");
-
-// busca
-clientQ?.addEventListener("input", (e) => {
-  renderClients(e.target.value);
-});
-
-
-  // 4) produtos
- const { data: productsRaw, error: pe } = await sb
-  .from("products")
-  .select("id, name, unit, product_type, price, min_qty, is_active")
-  .eq("company_id", company_id)
-  .order("name");
-if (pe) throw pe;
-
-// considera ativo tudo que não for false
-const products = (productsRaw || []).filter(p => p.is_active !== false);
-
-
-  // === estado do POS (em memória) ===
-  const cart = new Map(); // product_id -> {product, qty, price}
+  // === estado do POS (memória) ===
+  const cart = new Map();
 
   const $prodWrap = document.getElementById("posProducts");
   const $prodMsg  = document.getElementById("posProdMsg");
@@ -1151,13 +1137,15 @@ const products = (productsRaw || []).filter(p => p.is_active !== false);
   const $sum      = document.getElementById("posSummary");
   const $msg      = document.getElementById("posMsg");
 
+  const fmt = (n) => Number(n || 0).toLocaleString();
+  const money = (n) => Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
   const getOnHandMap = async (warehouse_id) => {
     const { data: rows, error } = await sb
       .from("vw_stock_levels")
       .select("product_id, on_hand, min_qty")
       .eq("company_id", company_id)
       .eq("warehouse_id", warehouse_id);
-
     if (error) throw error;
 
     const map = {};
@@ -1167,14 +1155,11 @@ const products = (productsRaw || []).filter(p => p.is_active !== false);
 
   let onHandMap = await getOnHandMap(whSel.value);
 
-  const fmt = (n) => Number(n || 0).toLocaleString();
-  const money = (n) => Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
   const renderProducts = (filterText = "") => {
     const q = String(filterText || "").trim().toLowerCase();
+    const list = (activeProducts || []).filter(p => !q || p.name.toLowerCase().includes(q));
 
-    const list = (products || []).filter(p => !q || p.name.toLowerCase().includes(q));
-
+    if (!$prodWrap) return;
     if (!list.length) {
       $prodWrap.innerHTML = `<div class="muted small">Sem produtos.</div>`;
       return;
@@ -1186,20 +1171,16 @@ const products = (productsRaw || []).filter(p => p.is_active !== false);
       const min_qty = lvl?.min_qty ?? p.min_qty ?? 0;
 
       const low = Number(on_hand) <= Number(min_qty);
-      const warn = low ? `⚠️` : `✅`;
+      const badge = low ? "⚠️" : "✅";
 
       return `
         <div class="card" style="padding:12px;display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap">
           <div style="min-width:260px">
             <div style="font-weight:950">${p.name} <span class="muted small">(${p.product_type})</span></div>
-            <div class="muted small">
-              ${warn} Stock: <b>${fmt(on_hand)}</b> ${p.unit || ""} | Mín: <b>${fmt(min_qty)}</b>
-            </div>
+            <div class="muted small">${badge} Stock: <b>${fmt(on_hand)}</b> ${p.unit || ""} | Mín: <b>${fmt(min_qty)}</b></div>
           </div>
-
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
             <div style="font-weight:950">Preço: ${money(p.price || 0)}</div>
-
             <button data-add="${p.id}" type="button"
               style="padding:10px 12px;border-radius:12px;border:1px solid rgba(0,0,0,.12);font-weight:900;cursor:pointer">
               + Adicionar
@@ -1209,16 +1190,14 @@ const products = (productsRaw || []).filter(p => p.is_active !== false);
       `;
     }).join("");
 
-    // binds add buttons
     $prodWrap.querySelectorAll("[data-add]").forEach(btn => {
       btn.addEventListener("click", () => {
         const pid = btn.getAttribute("data-add");
-        const p = products.find(x => x.id === pid);
+        const p = activeProducts.find(x => x.id === pid);
         if (!p) return;
 
         const cur = cart.get(pid);
         const newQty = (cur?.qty || 0) + 1;
-
         cart.set(pid, { product: p, qty: newQty, price: Number(p.price || 0) });
         renderCart();
       });
@@ -1227,6 +1206,7 @@ const products = (productsRaw || []).filter(p => p.is_active !== false);
 
   const renderCart = () => {
     const items = Array.from(cart.values());
+    if (!$cartBody || !$sum) return;
 
     if (!items.length) {
       $cartBody.innerHTML = `<tr><td class="muted small" style="padding:10px" colspan="5">Carrinho vazio.</td></tr>`;
@@ -1239,7 +1219,6 @@ const products = (productsRaw || []).filter(p => p.is_active !== false);
     $cartBody.innerHTML = items.map(it => {
       const p = it.product;
       const line = it.qty * it.price;
-
       return `
         <tr>
           <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);font-weight:900">${p.name}</td>
@@ -1261,7 +1240,6 @@ const products = (productsRaw || []).filter(p => p.is_active !== false);
 
     $sum.textContent = `Itens: ${items.length} | Total: ${money(total)}`;
 
-    // binds qty
     $cartBody.querySelectorAll("[data-qty]").forEach(inp => {
       inp.addEventListener("change", () => {
         const pid = inp.getAttribute("data-qty");
@@ -1277,164 +1255,38 @@ const products = (productsRaw || []).filter(p => p.is_active !== false);
       });
     });
 
-    // binds remove
     $cartBody.querySelectorAll("[data-rm]").forEach(btn => {
       btn.addEventListener("click", () => {
-        const pid = btn.getAttribute("data-rm");
-        cart.delete(pid);
+        cart.delete(btn.getAttribute("data-rm"));
         renderCart();
       });
     });
   };
 
-  // pesquisa
-  document.getElementById("posSearch")?.addEventListener("input", (e) => {
-    renderProducts(e.target.value);
-  });
+  document.getElementById("posSearch")?.addEventListener("input", (e) => renderProducts(e.target.value));
 
-  // troca armazém => recarrega níveis
   whSel.addEventListener("change", async () => {
     try {
-      $prodMsg.textContent = "A atualizar stock…";
+      if ($prodMsg) $prodMsg.textContent = "A atualizar stock…";
       onHandMap = await getOnHandMap(whSel.value);
       renderProducts(document.getElementById("posSearch")?.value || "");
-      $prodMsg.textContent = "";
+      if ($prodMsg) $prodMsg.textContent = "";
     } catch (err) {
-      $prodMsg.textContent = "❌ " + (err?.message || err);
+      if ($prodMsg) $prodMsg.textContent = "❌ " + (err?.message || err);
     }
   });
 
-  // limpar carrinho
   document.getElementById("posClear")?.addEventListener("click", () => {
     cart.clear();
-    $msg.textContent = "";
+    if ($msg) $msg.textContent = "";
     renderCart();
   });
 
-// finalizar
-bindOnce(document.getElementById("posCheckout"), "posCheckout", "click", async () => {
- 
-  try {
-    $msg.textContent = "A finalizar…";
-     
-    const client_id = document.getElementById("posClient")?.value || null;
-    if (!client_id) throw new Error("Selecione o cliente.");
-
-
-    const items = Array.from(cart.values()).map(it => ({
-      product_id: it.product.id,
-      qty: it.qty,
-      price: it.price
-    }));
-    if (!items.length) throw new Error("Carrinho vazio.");
-
-    const warehouse_id = whSel.value;
-    const ref_note = document.getElementById("posNote")?.value || "Venda POS";
-
-    // total do carrinho
-    const total = items.reduce((a, it) => a + (Number(it.qty) * Number(it.price)), 0);
-
-    // valor recebido
-    const received = Number(document.getElementById("posPaid")?.value || 0);
-
-    const paid   = Math.min(received, total);
-    const change = Math.max(received - total, 0);
-    const due    = Math.max(total - received, 0);
-
-    // 1) cria venda via RPC (baixa stock)
-    const sale_id = await DC_DB.createSale({
-      company_id,
-      branch_id,
-      warehouse_id,
-      client_id,            // <-- GARANTE que teu RPC aceita isso; se não aceitar, eu ajusto o RPC contigo
-      items,
-      ref_note
-    });
-     await DC_DB.supabase
-  .from("sales")
-  .update({ client_id })
-  .eq("id", sale_id);
-
-
-    // 2) status da venda
-    const status = due > 0 ? (paid > 0 ? "PARTIAL" : "DUE") : "PAID";
-
-    // atualiza status e total (se teu RPC não gravar total certinho)
-    await DC_DB.supabase
-      .from("sales")
-      .update({ status, total, client_id, ref_note })
-      .eq("id", sale_id);
-
-    // 3) regista pagamento (se paid > 0)
-    const account_id = document.getElementById("posAccount")?.value || null;
-    const method = document.getElementById("posPayMethod")?.value || "cash";
-
-    if (paid > 0) {
-      // (a) tabela sale_payments
-      await DC_DB.supabase.from("sale_payments").insert({
-        company_id,
-        sale_id,
-        account_id,
-        method,
-        amount: paid,
-        created_by: DC_STATE.state.session.userId || null
-      });
-
-      // (b) caixa (cash_moves) — entra só o que foi pago
-      if (account_id) {
-        await DC_DB.createCashMove({
-          company_id,
-          branch_id,
-          account_id,
-          move_type: "IN",
-          amount: paid,
-          ref_type: "sale",
-          ref_id: sale_id,
-          note: `Recebimento venda | ${ref_note}`
-        });
-      }
-    }
-
-    // 4) se ficou dívida, lança no ledger do cliente
-    if (due > 0) {
-      await DC_DB.supabase.from("client_ledger").insert({
-        company_id,
-        client_id,
-        entry_type: "DEBIT",
-        amount: due,
-        ref_type: "sale",
-        ref_id: sale_id,
-        note: `Dívida da venda | ${ref_note}`,
-        created_by: DC_STATE.state.session.userId || null
-      });
-    }
-
-    // UI
-    cart.clear();
-    renderCart();
-
-    onHandMap = await getOnHandMap(warehouse_id);
-    renderProducts(document.getElementById("posSearch")?.value || "");
-
-    await STOCK_UI.refreshLowStockBadge();
-
-    $msg.textContent =
-      `✅ Venda: ${sale_id} | Total: ${money(total)} | Pago: ${money(paid)}`
-      + (due > 0 ? ` | Dívida: ${money(due)}` : "")
-      + (change > 0 ? ` | Troco: ${money(change)}` : "");
-
-    DC_HELPERS.toast("Venda finalizada!", "ok");
-  } catch (err) {
-    $msg.textContent = "❌ " + (err?.message || err);
-    DC_HELPERS.toast(err?.message || "Erro", "err");
-  }
-});
-
-
-  // first render
+  // primeiro render
   renderProducts("");
   renderCart();
 };
+
 
        
 
