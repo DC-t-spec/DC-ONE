@@ -1974,20 +1974,22 @@ const CLIENTS_UI = (() => {
         </label>
       </div>
 
-      <div class="card" style="padding:12px">
-        <div class="subtitle subtitle--sm">Ações</div>
-       <button id="cliNew" type="button">+ Novo Cliente</button>
-          style="margin-top:8px;padding:12px 14px;border-radius:14px;border:1px solid rgba(0,0,0,.12);font-weight:900;cursor:pointer">
-          + Novo Cliente
-        </button>
+<div class="card" style="padding:12px">
+  <div class="subtitle subtitle--sm">Ações</div>
 
-        <button id="cliRefresh" type="button"
-          style="margin-top:10px;padding:10px 12px;border-radius:12px;border:1px solid rgba(0,0,0,.12);font-weight:900;cursor:pointer">
-          Atualizar Lista
-        </button>
+  <button id="cliNew" type="button"
+    style="margin-top:8px;padding:12px 14px;border-radius:14px;border:1px solid rgba(0,0,0,.12);font-weight:900;cursor:pointer">
+    + Novo Cliente
+  </button>
 
-        <p id="cliMsg" class="muted small" style="margin-top:10px"></p>
-      </div>
+  <button id="cliRefresh" type="button"
+    style="margin-top:10px;padding:10px 12px;border-radius:12px;border:1px solid rgba(0,0,0,.12);font-weight:900;cursor:pointer">
+    Atualizar Lista
+  </button>
+
+  <p id="cliMsg" class="muted small" style="margin-top:10px"></p>
+</div>
+
     </div>
 
     <div class="card" style="padding:12px;margin-top:12px">
