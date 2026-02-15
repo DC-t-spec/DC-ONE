@@ -390,7 +390,7 @@ async createCashMove({ company_id, branch_id, account_id, move_type, amount, ref
   return true;
 },
 // =====================
-// CLIENTES (CRUD) - SEM address/created_by
+// CLIENTES (CRUD)
 // =====================
 async listClients(company_id, { include_inactive = false } = {}) {
   let q = supabase
@@ -440,17 +440,6 @@ async updateClient({ company_id, id, name, phone, email }) {
   return data;
 },
 
-
-async setClientActive({ company_id, id, is_active }) {
-  const { error } = await supabase
-    .from("clients")
-    .update({ is_active: !!is_active })
-    .eq("company_id", company_id)
-    .eq("id", id);
-
-  if (error) throw error;
-  return true;
-},
 
     };
 
@@ -1632,14 +1621,14 @@ const CLIENTS_UI = (() => {
 
               fm.textContent = "A guardar…";
 
-              await DC_DB.updateClient({
-                company_id,
-                id: client.id,
-                name,
-                phone: (document.getElementById("cliPhone")?.value || "").trim(),
-                email: (document.getElementById("cliEmail")?.value || "").trim(),
-                address: (document.getElementById("cliAddress")?.value || "").trim()
-              });
+           await DC_DB.updateClient({
+  company_id,
+  id: client.id,
+  name,
+  phone: (document.getElementById("cliPhone")?.value || "").trim(),
+  email: (document.getElementById("cliEmail")?.value || "").trim()
+});
+
 
               close();
               await load();
@@ -1703,13 +1692,13 @@ const CLIENTS_UI = (() => {
 
           fm.textContent = "A guardar…";
 
-          await DC_DB.createClient({
-            company_id,
-            name,
-            phone: (document.getElementById("cliPhone")?.value || "").trim(),
-            email: (document.getElementById("cliEmail")?.value || "").trim(),
-            address: (document.getElementById("cliAddress")?.value || "").trim()
-          });
+        await DC_DB.createClient({
+  company_id,
+  name,
+  phone: (document.getElementById("cliPhone")?.value || "").trim(),
+  email: (document.getElementById("cliEmail")?.value || "").trim()
+});
+
 
           close();
           await load();
