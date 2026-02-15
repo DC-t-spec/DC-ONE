@@ -1034,46 +1034,7 @@ async createCashMove({ company_id, branch_id, account_id, move_type, amount, ref
 
   whSel.innerHTML = whs.map(w => `<option value="${w.id}">${w.name}</option>`).join("");
   if (whHint) whHint.textContent = "MVP: vais vender usando o armazém selecionado acima.";
-          // ===== CLIENTES =====
-const clientSel = document.getElementById("posClient");
-const clientSearch = document.getElementById("posClientSearch");
-
-if (clientSel) {
-  const { data: clients, error } = await sb
-    .from("clients")
-    .select("id, name")
-    .eq("company_id", company_id)
-    .order("name");
-
-  if (!error && clients) {
-    clientSel.innerHTML =
-      `<option value="">— Selecionar cliente —</option>` +
-      clients.map(c =>
-        `<option value="${c.id}">${c.name}</option>`
-      ).join("");
-  }
-}
-
-// pesquisa cliente
-clientSearch?.addEventListener("input", async (e) => {
-  const q = e.target.value.toLowerCase();
-
-  const { data: clients } = await sb
-    .from("clients")
-    .select("id, name")
-    .eq("company_id", company_id)
-    .ilike("name", `%${q}%`)
-    .order("name");
-
-  if (clientSel && clients) {
-    clientSel.innerHTML =
-      `<option value="">— Selecionar cliente —</option>` +
-      clients.map(c =>
-        `<option value="${c.id}">${c.name}</option>`
-      ).join("");
-  }
-});
-
+       
 
   // 3) contas (banco/caixa/etc.)
   const accSel = document.getElementById("posAccount");
@@ -1334,10 +1295,9 @@ bindOnce(document.getElementById("posCheckout"), "posCheckout", "click", async (
  
   try {
     $msg.textContent = "A finalizar…";
-       const client_id = document.getElementById("posClient")?.value || null;
-
-// Se quiseres OBRIGAR cliente:
-if (!client_id) throw new Error("Selecione o cliente.");
+     
+    const client_id = document.getElementById("posClient")?.value || null;
+    if (!client_id) throw new Error("Selecione o cliente.");
 
 
     const items = Array.from(cart.values()).map(it => ({
@@ -1352,10 +1312,6 @@ if (!client_id) throw new Error("Selecione o cliente.");
 
     // total do carrinho
     const total = items.reduce((a, it) => a + (Number(it.qty) * Number(it.price)), 0);
-
-    // cliente (tu vais pôr um select #posClient)
-    const client_id = document.getElementById("posClient")?.value || null;
-    if (!client_id) throw new Error("Selecione o cliente.");
 
     // valor recebido
     const received = Number(document.getElementById("posPaid")?.value || 0);
@@ -1860,9 +1816,7 @@ if (!client_id) throw new Error("Selecione o cliente.");
           DC_UI.highlightRoute(route);
           DC_UI.setHeader(route);
           DC_UI.renderRoute(route);
-  if (route === "sales") {
-  DC_UI.stock.initSalesScreen();
-}
+  
 
 
 
