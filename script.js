@@ -1976,7 +1976,7 @@ const CLIENTS_UI = (() => {
 
       <div class="card" style="padding:12px">
         <div class="subtitle subtitle--sm">Ações</div>
-        <button id="cliNew" type="button"
+       <button id="cliNew" type="button">+ Novo Cliente</button>
           style="margin-top:8px;padding:12px 14px;border-radius:14px;border:1px solid rgba(0,0,0,.12);font-weight:900;cursor:pointer">
           + Novo Cliente
         </button>
@@ -2098,8 +2098,8 @@ if (u.currentRoute === "sales") {
         if (u.currentRoute === "stock") {
           setTimeout(() => STOCK_UI.initStockScreen(), 0);
         }
-         if (u.currentRoute === "clients") {
-  setTimeout(() => CLIENTS_UI.initClientsScreen(), 0);
+       if (u.currentRoute === "clients") {
+  setTimeout(() => DC_UI.clients.initClientsScreen(), 0);
 }
 
       }
@@ -2115,7 +2115,9 @@ if (u.currentRoute === "sales") {
       syncAll,
 
       // expõe stock ui
-      stock: STOCK_UI
+      stock: STOCK_UI,
+        // ✅ expõe clients ui
+  clients: CLIENTS_UI
     };
   })();
 
@@ -2202,7 +2204,7 @@ if (u.currentRoute === "sales") {
           // init stock ao entrar
           if (route === "stock") DC_UI.stock.initStockScreen();
            if (route === "sales") DC_UI.stock.initSalesScreen();
-           if (route === "clients") CLIENTS_UI.initClientsScreen();
+         if (route === "clients") DC_UI.clients.initClientsScreen();
 
 
         });
