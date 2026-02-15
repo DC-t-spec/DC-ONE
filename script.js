@@ -657,13 +657,14 @@ async createCashMove({ company_id, branch_id, account_id, move_type, amount, ref
        STOCK_UI (1x listeners)
     ========================= */
     const STOCK_UI = (() => {
-      const bindOnce = (el, key, eventName, handler) => {
-        if (!el) return;
-        const k = `bound_${key}_${eventName}`;
-        if (el.dataset[k] === "1") return;
-        el.dataset[k] = "1";
-        el.addEventListener(eventName, handler);
-      };
+     function bindOnce(el, key, eventName, handler) {
+  if (!el) return;
+  const k = `bound_${key}_${eventName}`;
+  if (el.dataset[k] === "1") return;
+  el.dataset[k] = "1";
+  el.addEventListener(eventName, handler);
+}
+
 
       const refreshLowStockBadge = async () => {
         const el = document.getElementById("badgeLowStock");
@@ -1013,6 +1014,7 @@ async createCashMove({ company_id, branch_id, account_id, move_type, amount, ref
         await refreshLowStockBadge();
       };
        const initSalesScreen = async () => {
+   
   const route = DC_STATE.state.ui.currentRoute;
   if (route !== "sales") return;
 
