@@ -1034,6 +1034,46 @@ async createCashMove({ company_id, branch_id, account_id, move_type, amount, ref
 
   whSel.innerHTML = whs.map(w => `<option value="${w.id}">${w.name}</option>`).join("");
   if (whHint) whHint.textContent = "MVP: vais vender usando o armazém selecionado acima.";
+          // ===== CLIENTES =====
+const clientSel = document.getElementById("posClient");
+const clientSearch = document.getElementById("posClientSearch");
+
+if (clientSel) {
+  const { data: clients, error } = await sb
+    .from("clients")
+    .select("id, name")
+    .eq("company_id", company_id)
+    .order("name");
+
+  if (!error && clients) {
+    clientSel.innerHTML =
+      `<option value="">— Selecionar cliente —</option>` +
+      clients.map(c =>
+        `<option value="${c.id}">${c.name}</option>`
+      ).join("");
+  }
+}
+
+// pesquisa cliente
+clientSearch?.addEventListener("input", async (e) => {
+  const q = e.target.value.toLowerCase();
+
+  const { data: clients } = await sb
+    .from("clients")
+    .select("id, name")
+    .eq("company_id", company_id)
+    .ilike("name", `%${q}%`)
+    .order("name");
+
+  if (clientSel && clients) {
+    clientSel.innerHTML =
+      `<option value="">— Selecionar cliente —</option>` +
+      clients.map(c =>
+        `<option value="${c.id}">${c.name}</option>`
+      ).join("");
+  }
+});
+
 
   // 3) contas (banco/caixa/etc.)
   const accSel = document.getElementById("posAccount");
@@ -1048,6 +1088,68 @@ async createCashMove({ company_id, branch_id, account_id, move_type, amount, ref
       accSel.innerHTML = `<option value="">— Não movimentar —</option>`;
     }
   }
+          // ===== CLIENTES =====
+const clientSel  = document.getElementById("posClient");
+const clientQ    = document.getElementById("posClientSearch");
+const clientHint = document.getElementById("posClientHint");
+
+const loadClients = async () => {
+  // Ajusta os campos conforme a tua tabela:
+  // aqui eu assumo que tens: id, name, phone (se não tiver phone, remove do select)
+  const { data, error } = await sb
+    .from("clients")
+    .select("id, name, phone")
+    .eq("company_id", company_id)
+    .order("name");
+
+  if (error) throw error;
+  return data || [];
+};
+
+let clients = [];
+try {
+  clients = await loadClients();
+} catch (e) {
+  clients = [];
+  if (clientHint) clientHint.textContent = "❌ Não foi possível carregar clientes.";
+}
+
+const renderClients = (filterText = "") => {
+  if (!clientSel) return;
+
+  const q = String(filterText || "").trim().toLowerCase();
+
+  const list = (clients || []).filter(c => {
+    const name = String(c.name || "").toLowerCase();
+    const phone = String(c.phone || "").toLowerCase();
+    return !q || name.includes(q) || phone.includes(q);
+  });
+
+  if (!list.length) {
+    clientSel.innerHTML = `<option value="">— Sem clientes —</option>`;
+    if (clientHint) clientHint.textContent = "Crie clientes em Clientes para poder vender com dívida.";
+    return;
+  }
+
+  // Se quiseres OBRIGAR cliente, remove a primeira opção vazia
+  clientSel.innerHTML =
+    `<option value="">— Selecionar cliente —</option>` +
+    list.map(c => {
+      const label = `${c.name}${c.phone ? ` • ${c.phone}` : ""}`;
+      return `<option value="${c.id}">${label}</option>`;
+    }).join("");
+
+  if (clientHint) clientHint.textContent = "Pagamento parcial cria dívida ligada ao cliente.";
+};
+
+// primeira renderização
+renderClients("");
+
+// busca
+clientQ?.addEventListener("input", (e) => {
+  renderClients(e.target.value);
+});
+
 
   // 4) produtos
   const { data: products, error: pe } = await sb
@@ -1227,36 +1329,82 @@ async createCashMove({ company_id, branch_id, account_id, move_type, amount, ref
     renderCart();
   });
 
-  // finalizar
+// finalizar
 bindOnce(document.getElementById("posCheckout"), "posCheckout", "click", async () => {
-    try {
-      $msg.textContent = "A finalizar…";
+ 
+  try {
+    $msg.textContent = "A finalizar…";
+       const client_id = document.getElementById("posClient")?.value || null;
 
-      const items = Array.from(cart.values()).map(it => ({
-        product_id: it.product.id,
-        qty: it.qty,
-        price: it.price
-      }));
+// Se quiseres OBRIGAR cliente:
+if (!client_id) throw new Error("Selecione o cliente.");
 
-      if (!items.length) throw new Error("Carrinho vazio.");
 
-      const warehouse_id = whSel.value;
-      const ref_note = document.getElementById("posNote")?.value || "Venda POS";
+    const items = Array.from(cart.values()).map(it => ({
+      product_id: it.product.id,
+      qty: it.qty,
+      price: it.price
+    }));
+    if (!items.length) throw new Error("Carrinho vazio.");
 
-      // chama RPC (valida stock + cria sale + baixa stock)
-      const sale_id = await DC_DB.createSale({
+    const warehouse_id = whSel.value;
+    const ref_note = document.getElementById("posNote")?.value || "Venda POS";
+
+    // total do carrinho
+    const total = items.reduce((a, it) => a + (Number(it.qty) * Number(it.price)), 0);
+
+    // cliente (tu vais pôr um select #posClient)
+    const client_id = document.getElementById("posClient")?.value || null;
+    if (!client_id) throw new Error("Selecione o cliente.");
+
+    // valor recebido
+    const received = Number(document.getElementById("posPaid")?.value || 0);
+
+    const paid   = Math.min(received, total);
+    const change = Math.max(received - total, 0);
+    const due    = Math.max(total - received, 0);
+
+    // 1) cria venda via RPC (baixa stock)
+    const sale_id = await DC_DB.createSale({
+      company_id,
+      branch_id,
+      warehouse_id,
+      client_id,            // <-- GARANTE que teu RPC aceita isso; se não aceitar, eu ajusto o RPC contigo
+      items,
+      ref_note
+    });
+     await DC_DB.supabase
+  .from("sales")
+  .update({ client_id })
+  .eq("id", sale_id);
+
+
+    // 2) status da venda
+    const status = due > 0 ? (paid > 0 ? "PARTIAL" : "DUE") : "PAID";
+
+    // atualiza status e total (se teu RPC não gravar total certinho)
+    await DC_DB.supabase
+      .from("sales")
+      .update({ status, total, client_id, ref_note })
+      .eq("id", sale_id);
+
+    // 3) regista pagamento (se paid > 0)
+    const account_id = document.getElementById("posAccount")?.value || null;
+    const method = document.getElementById("posPayMethod")?.value || "cash";
+
+    if (paid > 0) {
+      // (a) tabela sale_payments
+      await DC_DB.supabase.from("sale_payments").insert({
         company_id,
-        branch_id,
-        warehouse_id,
-        items,
-        ref_note
+        sale_id,
+        account_id,
+        method,
+        amount: paid,
+        created_by: DC_STATE.state.session.userId || null
       });
 
-      // movimenta caixa (se valor recebido > 0 e conta escolhida)
-      const paid = Number(document.getElementById("posPaid")?.value || 0);
-      const account_id = document.getElementById("posAccount")?.value || "";
-
-      if (paid > 0 && account_id) {
+      // (b) caixa (cash_moves) — entra só o que foi pago
+      if (account_id) {
         await DC_DB.createCashMove({
           company_id,
           branch_id,
@@ -1268,25 +1416,43 @@ bindOnce(document.getElementById("posCheckout"), "posCheckout", "click", async (
           note: `Recebimento venda | ${ref_note}`
         });
       }
-
-      // UI
-      cart.clear();
-      renderCart();
-
-      // atualiza níveis
-      onHandMap = await getOnHandMap(warehouse_id);
-      renderProducts(document.getElementById("posSearch")?.value || "");
-
-      // badge/alerta stock
-      await DC_UI.refreshLowStockBadge?.();
-
-      $msg.textContent = `✅ Venda criada: ${sale_id}`;
-      DC_HELPERS.toast("Venda finalizada!", "ok");
-    } catch (err) {
-      $msg.textContent = "❌ " + (err?.message || err);
-      DC_HELPERS.toast(err?.message || "Erro", "err");
     }
-  });
+
+    // 4) se ficou dívida, lança no ledger do cliente
+    if (due > 0) {
+      await DC_DB.supabase.from("client_ledger").insert({
+        company_id,
+        client_id,
+        entry_type: "DEBIT",
+        amount: due,
+        ref_type: "sale",
+        ref_id: sale_id,
+        note: `Dívida da venda | ${ref_note}`,
+        created_by: DC_STATE.state.session.userId || null
+      });
+    }
+
+    // UI
+    cart.clear();
+    renderCart();
+
+    onHandMap = await getOnHandMap(warehouse_id);
+    renderProducts(document.getElementById("posSearch")?.value || "");
+
+    await STOCK_UI.refreshLowStockBadge();
+
+    $msg.textContent =
+      `✅ Venda: ${sale_id} | Total: ${money(total)} | Pago: ${money(paid)}`
+      + (due > 0 ? ` | Dívida: ${money(due)}` : "")
+      + (change > 0 ? ` | Troco: ${money(change)}` : "");
+
+    DC_HELPERS.toast("Venda finalizada!", "ok");
+  } catch (err) {
+    $msg.textContent = "❌ " + (err?.message || err);
+    DC_HELPERS.toast(err?.message || "Erro", "err");
+  }
+});
+
 
   // first render
   renderProducts("");
@@ -1324,6 +1490,18 @@ bindOnce(document.getElementById("posCheckout"), "posCheckout", "click", async (
         <select id="posWarehouse" style="width:100%;padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12)"></select>
         <p class="muted small" id="posWarehouseHint" style="margin-top:8px"></p>
       </div>
+      <div class="card" style="padding:12px;margin-top:12px">
+  <div class="subtitle subtitle--sm">Cliente</div>
+
+  <input id="posClientSearch" placeholder="Pesquisar cliente..."
+    style="width:100%;padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12);margin-top:8px"/>
+
+  <select id="posClient"
+    style="width:100%;padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12);margin-top:10px"></select>
+
+  <p class="muted small" id="posClientHint" style="margin-top:8px"></p>
+</div>
+
 
       <div class="card" style="padding:12px">
         <div class="subtitle subtitle--sm">Conta a movimentar</div>
