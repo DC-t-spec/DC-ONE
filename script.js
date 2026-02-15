@@ -347,6 +347,49 @@
         if (error) throw error;
         return data;
       }
+       async createSale({ company_id, branch_id, warehouse_id, items, ref_note }) {
+  const created_by = DC_STATE.state.session.userId || null;
+
+  const { data, error } = await supabase.rpc("dc_create_sale", {
+    p_company_id: company_id,
+    p_branch_id: branch_id,
+    p_warehouse_id: warehouse_id,
+    p_items: items,            // array JS vira jsonb
+    p_ref_note: ref_note ?? null,
+    p_created_by: created_by
+  });
+  if (error) throw error;
+  return data; // sale_id
+},
+async listCashAccounts(company_id) {
+  const { data, error } = await supabase
+    .from("cash_accounts")
+    .select("id,name,type")
+    .eq("company_id", company_id)
+    .eq("is_active", true)
+    .order("name");
+  if (error) throw error;
+  return data || [];
+},
+
+async createCashMove({ company_id, branch_id, account_id, move_type, amount, ref_type, ref_id, note }) {
+  const created_by = DC_STATE.state.session.userId || null;
+
+  const { error } = await supabase.from("cash_moves").insert({
+    company_id,
+    branch_id,
+    account_id,
+    move_type,
+    amount,
+    ref_type,
+    ref_id: ref_id ?? null,
+    note: note ?? null,
+    created_by
+  });
+  if (error) throw error;
+  return true;
+},
+
     };
 
     window.addEventListener("unhandledrejection", (e) => {
@@ -951,8 +994,308 @@
 
         await refreshLowStockBadge();
       };
+       const initSalesScreen = async () => {
+  const route = DC_STATE.state.ui.currentRoute;
+  if (route !== "sales") return;
 
-      return { refreshLowStockBadge, openLowStockModal, initStockScreen };
+  const sb = DC_DB.supabase;
+  const company_id = DC_STATE.state.session.companyId;
+
+  // 1) branch MVP (primeira)
+  const { data: branches, error: be } = await sb
+    .from("branches")
+    .select("id")
+    .eq("company_id", company_id)
+    .order("created_at", { ascending: true })
+    .limit(1);
+  if (be) throw be;
+
+  const branch_id = branches?.[0]?.id;
+  if (!branch_id) throw new Error("Crie uma filial (branches) para continuar.");
+
+  // 2) armazéns da branch (MVP: escolhe na UI mas é “fixo” para a venda)
+  const { data: whs, error: we } = await sb
+    .from("warehouses")
+    .select("id,name")
+    .eq("company_id", company_id)
+    .eq("branch_id", branch_id)
+    .order("name");
+  if (we) throw we;
+
+  const whSel = document.getElementById("posWarehouse");
+  const whHint = document.getElementById("posWarehouseHint");
+  if (!whSel) return;
+
+  if (!whs?.length) {
+    whSel.innerHTML = "";
+    if (whHint) whHint.textContent = "❌ Crie um armazém para vender.";
+    return;
+  }
+
+  whSel.innerHTML = whs.map(w => `<option value="${w.id}">${w.name}</option>`).join("");
+  if (whHint) whHint.textContent = "MVP: vais vender usando o armazém selecionado acima.";
+
+  // 3) contas (banco/caixa/etc.)
+  const accSel = document.getElementById("posAccount");
+  if (accSel) {
+    try {
+      const accs = await DC_DB.listCashAccounts(company_id);
+      accSel.innerHTML = `<option value="">— Não movimentar —</option>` + accs.map(a => {
+        const label = `${a.name} (${a.type})`;
+        return `<option value="${a.id}">${label}</option>`;
+      }).join("");
+    } catch {
+      accSel.innerHTML = `<option value="">— Não movimentar —</option>`;
+    }
+  }
+
+  // 4) produtos
+  const { data: products, error: pe } = await sb
+    .from("products")
+    .select("id, name, unit, product_type, price, min_qty")
+    .eq("company_id", company_id)
+    .eq("is_active", true)
+    .order("name");
+  if (pe) throw pe;
+
+  // === estado do POS (em memória) ===
+  const cart = new Map(); // product_id -> {product, qty, price}
+
+  const $prodWrap = document.getElementById("posProducts");
+  const $prodMsg  = document.getElementById("posProdMsg");
+  const $cartBody = document.getElementById("posCartBody");
+  const $sum      = document.getElementById("posSummary");
+  const $msg      = document.getElementById("posMsg");
+
+  const getOnHandMap = async (warehouse_id) => {
+    const { data: rows, error } = await sb
+      .from("vw_stock_levels")
+      .select("product_id, on_hand, min_qty")
+      .eq("company_id", company_id)
+      .eq("warehouse_id", warehouse_id);
+
+    if (error) throw error;
+
+    const map = {};
+    (rows || []).forEach(r => { map[r.product_id] = r; });
+    return map;
+  };
+
+  let onHandMap = await getOnHandMap(whSel.value);
+
+  const fmt = (n) => Number(n || 0).toLocaleString();
+  const money = (n) => Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  const renderProducts = (filterText = "") => {
+    const q = String(filterText || "").trim().toLowerCase();
+
+    const list = (products || []).filter(p => !q || p.name.toLowerCase().includes(q));
+
+    if (!list.length) {
+      $prodWrap.innerHTML = `<div class="muted small">Sem produtos.</div>`;
+      return;
+    }
+
+    $prodWrap.innerHTML = list.map(p => {
+      const lvl = onHandMap[p.id];
+      const on_hand = lvl?.on_hand ?? 0;
+      const min_qty = lvl?.min_qty ?? p.min_qty ?? 0;
+
+      const low = Number(on_hand) <= Number(min_qty);
+      const warn = low ? `⚠️` : `✅`;
+
+      return `
+        <div class="card" style="padding:12px;display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap">
+          <div style="min-width:260px">
+            <div style="font-weight:950">${p.name} <span class="muted small">(${p.product_type})</span></div>
+            <div class="muted small">
+              ${warn} Stock: <b>${fmt(on_hand)}</b> ${p.unit || ""} | Mín: <b>${fmt(min_qty)}</b>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <div style="font-weight:950">Preço: ${money(p.price || 0)}</div>
+
+            <button data-add="${p.id}" type="button"
+              style="padding:10px 12px;border-radius:12px;border:1px solid rgba(0,0,0,.12);font-weight:900;cursor:pointer">
+              + Adicionar
+            </button>
+          </div>
+        </div>
+      `;
+    }).join("");
+
+    // binds add buttons
+    $prodWrap.querySelectorAll("[data-add]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const pid = btn.getAttribute("data-add");
+        const p = products.find(x => x.id === pid);
+        if (!p) return;
+
+        const cur = cart.get(pid);
+        const newQty = (cur?.qty || 0) + 1;
+
+        cart.set(pid, { product: p, qty: newQty, price: Number(p.price || 0) });
+        renderCart();
+      });
+    });
+  };
+
+  const renderCart = () => {
+    const items = Array.from(cart.values());
+
+    if (!items.length) {
+      $cartBody.innerHTML = `<tr><td class="muted small" style="padding:10px" colspan="5">Carrinho vazio.</td></tr>`;
+      $sum.textContent = "—";
+      return;
+    }
+
+    const total = items.reduce((a, it) => a + (it.qty * it.price), 0);
+
+    $cartBody.innerHTML = items.map(it => {
+      const p = it.product;
+      const line = it.qty * it.price;
+
+      return `
+        <tr>
+          <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);font-weight:900">${p.name}</td>
+          <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);text-align:right">${money(it.price)}</td>
+          <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);text-align:right">
+            <input data-qty="${p.id}" type="number" step="0.001" min="0" value="${it.qty}"
+              style="width:110px;padding:8px;border-radius:10px;border:1px solid rgba(0,0,0,.12);text-align:right"/>
+          </td>
+          <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);text-align:right;font-weight:900">${money(line)}</td>
+          <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);text-align:right">
+            <button data-rm="${p.id}" type="button"
+              style="padding:8px 10px;border-radius:10px;border:1px solid rgba(0,0,0,.12);font-weight:900;cursor:pointer">
+              Remover
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join("");
+
+    $sum.textContent = `Itens: ${items.length} | Total: ${money(total)}`;
+
+    // binds qty
+    $cartBody.querySelectorAll("[data-qty]").forEach(inp => {
+      inp.addEventListener("change", () => {
+        const pid = inp.getAttribute("data-qty");
+        const v = Number(inp.value || 0);
+        if (!pid) return;
+
+        if (v <= 0) cart.delete(pid);
+        else {
+          const cur = cart.get(pid);
+          if (cur) cart.set(pid, { ...cur, qty: v });
+        }
+        renderCart();
+      });
+    });
+
+    // binds remove
+    $cartBody.querySelectorAll("[data-rm]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const pid = btn.getAttribute("data-rm");
+        cart.delete(pid);
+        renderCart();
+      });
+    });
+  };
+
+  // pesquisa
+  document.getElementById("posSearch")?.addEventListener("input", (e) => {
+    renderProducts(e.target.value);
+  });
+
+  // troca armazém => recarrega níveis
+  whSel.addEventListener("change", async () => {
+    try {
+      $prodMsg.textContent = "A atualizar stock…";
+      onHandMap = await getOnHandMap(whSel.value);
+      renderProducts(document.getElementById("posSearch")?.value || "");
+      $prodMsg.textContent = "";
+    } catch (err) {
+      $prodMsg.textContent = "❌ " + (err?.message || err);
+    }
+  });
+
+  // limpar carrinho
+  document.getElementById("posClear")?.addEventListener("click", () => {
+    cart.clear();
+    $msg.textContent = "";
+    renderCart();
+  });
+
+  // finalizar
+  document.getElementById("posCheckout")?.addEventListener("click", async () => {
+    try {
+      $msg.textContent = "A finalizar…";
+
+      const items = Array.from(cart.values()).map(it => ({
+        product_id: it.product.id,
+        qty: it.qty,
+        price: it.price
+      }));
+
+      if (!items.length) throw new Error("Carrinho vazio.");
+
+      const warehouse_id = whSel.value;
+      const ref_note = document.getElementById("posNote")?.value || "Venda POS";
+
+      // chama RPC (valida stock + cria sale + baixa stock)
+      const sale_id = await DC_DB.createSale({
+        company_id,
+        branch_id,
+        warehouse_id,
+        items,
+        ref_note
+      });
+
+      // movimenta caixa (se valor recebido > 0 e conta escolhida)
+      const paid = Number(document.getElementById("posPaid")?.value || 0);
+      const account_id = document.getElementById("posAccount")?.value || "";
+
+      if (paid > 0 && account_id) {
+        await DC_DB.createCashMove({
+          company_id,
+          branch_id,
+          account_id,
+          move_type: "IN",
+          amount: paid,
+          ref_type: "sale",
+          ref_id: sale_id,
+          note: `Recebimento venda | ${ref_note}`
+        });
+      }
+
+      // UI
+      cart.clear();
+      renderCart();
+
+      // atualiza níveis
+      onHandMap = await getOnHandMap(warehouse_id);
+      renderProducts(document.getElementById("posSearch")?.value || "");
+
+      // badge/alerta stock
+      await DC_UI.refreshLowStockBadge?.();
+
+      $msg.textContent = `✅ Venda criada: ${sale_id}`;
+      DC_HELPERS.toast("Venda finalizada!", "ok");
+    } catch (err) {
+      $msg.textContent = "❌ " + (err?.message || err);
+      DC_HELPERS.toast(err?.message || "Erro", "err");
+    }
+  });
+
+  // first render
+  renderProducts("");
+  renderCart();
+};
+
+       
+
+      return { refreshLowStockBadge, openLowStockModal, initStockScreen, initSalesScreen };
     })();
 
     /* =========================
@@ -968,12 +1311,110 @@
             <p class="muted">Visão geral: vendas, caixa, stock, alertas e KPIs.</p>
           </div>
         `,
-        sales: `
-          <div class="card">
-            <h2 class="subtitle">Vendas</h2>
-            <p class="muted">POS + histórico + cliente + pagamento.</p>
-          </div>
-        `,
+       sales: `
+  <div class="card">
+    <h2 class="subtitle">Vendas (POS)</h2>
+    <p class="muted">Seleciona produto, adiciona ao carrinho e finaliza a venda.</p>
+    <div class="divider"></div>
+
+    <!-- TOP BAR -->
+    <div class="grid" style="grid-template-columns: 1fr 1fr; gap:12px">
+      <div class="card" style="padding:12px">
+        <div class="subtitle subtitle--sm">Armazém (MVP fixo)</div>
+        <select id="posWarehouse" style="width:100%;padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12)"></select>
+        <p class="muted small" id="posWarehouseHint" style="margin-top:8px"></p>
+      </div>
+
+      <div class="card" style="padding:12px">
+        <div class="subtitle subtitle--sm">Conta a movimentar</div>
+        <select id="posAccount" style="width:100%;padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12)"></select>
+
+        <div style="display:flex;gap:10px;margin-top:10px;align-items:center;flex-wrap:wrap">
+          <select id="posPayMethod" style="flex:1;min-width:160px;padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12)">
+            <option value="cash">Dinheiro</option>
+            <option value="bank">Banco</option>
+            <option value="mobile">Mobile</option>
+            <option value="mixed">Misto</option>
+          </select>
+
+          <input id="posPaid" type="number" step="0.01" value="0"
+            style="flex:1;min-width:160px;padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12)"
+            placeholder="Valor recebido"/>
+        </div>
+
+        <p class="muted small" style="margin-top:8px">Se valor recebido = 0, não cria movimento de caixa.</p>
+      </div>
+    </div>
+
+    <!-- PRODUTOS -->
+    <div class="card" style="padding:12px;margin-top:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+        <div>
+          <div class="subtitle subtitle--sm">Produtos</div>
+          <div class="muted small">Mostra stock (on_hand) no armazém selecionado</div>
+        </div>
+        <input id="posSearch" placeholder="Pesquisar produto..."
+          style="padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12);min-width:220px"/>
+      </div>
+
+      <div class="divider"></div>
+
+      <div id="posProducts" style="display:grid;gap:10px"></div>
+      <p id="posProdMsg" class="muted small" style="margin-top:10px"></p>
+    </div>
+
+    <!-- CARRINHO -->
+    <div class="card" style="padding:12px;margin-top:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+        <div>
+          <div class="subtitle subtitle--sm">Carrinho</div>
+          <div class="muted small">Ajusta quantidades e finaliza</div>
+        </div>
+
+        <button id="posClear" type="button"
+          style="padding:10px 12px;border-radius:12px;border:1px solid rgba(0,0,0,.12);font-weight:900;cursor:pointer">
+          Limpar
+        </button>
+      </div>
+
+      <div class="divider"></div>
+
+      <div style="overflow:auto">
+        <table style="width:100%;border-collapse:collapse">
+          <thead>
+            <tr>
+              <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(0,0,0,.08)">Produto</th>
+              <th style="text-align:right;padding:10px;border-bottom:1px solid rgba(0,0,0,.08)">Preço</th>
+              <th style="text-align:right;padding:10px;border-bottom:1px solid rgba(0,0,0,.08)">Qtd</th>
+              <th style="text-align:right;padding:10px;border-bottom:1px solid rgba(0,0,0,.08)">Total</th>
+              <th style="text-align:right;padding:10px;border-bottom:1px solid rgba(0,0,0,.08)"></th>
+            </tr>
+          </thead>
+          <tbody id="posCartBody">
+            <tr><td class="muted small" style="padding:10px" colspan="5">Carrinho vazio.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="divider"></div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+        <div class="muted small" id="posSummary">—</div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <input id="posNote" placeholder="Nota (opcional)"
+            style="padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12);min-width:240px"/>
+          <button id="posCheckout" type="button"
+            style="padding:12px 14px;border-radius:14px;border:1px solid rgba(0,0,0,.12);font-weight:900;cursor:pointer">
+            Finalizar Venda
+          </button>
+        </div>
+      </div>
+
+      <p id="posMsg" class="muted small" style="margin-top:10px"></p>
+    </div>
+  </div>
+`,
+
         stock: `
           <div class="card">
             <h2 class="subtitle">Stock</h2>
@@ -1138,6 +1579,10 @@
         setHeader(u.currentRoute);
 
         renderRoute(u.currentRoute);
+         if (u.currentRoute === "sales") {
+  setTimeout(() => DC_UI.initSalesScreen(), 0);
+}
+
 
         // badge sempre atual
         STOCK_UI.refreshLowStockBadge();
@@ -1236,6 +1681,10 @@
           DC_UI.highlightRoute(route);
           DC_UI.setHeader(route);
           DC_UI.renderRoute(route);
+           if (route === "sales") {
+  DC_UI.initSalesScreen();
+}
+
 
           // badge sempre
           DC_UI.stock.refreshLowStockBadge();
