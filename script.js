@@ -1308,10 +1308,138 @@ clientQ?.addEventListener("input", (e) => renderClients(e.target.value));
     if ($msg) $msg.textContent = "";
     renderCart();
   });
+// ===== FINALIZAR VENDA =====
+bindOnce(document.getElementById("posCheckout"), "posCheckout", "click", async () => {
+  try {
+    if ($msg) $msg.textContent = "A finalizar…";
+
+    const items = Array.from(cart.values()).map(it => ({
+      product_id: it.product.id,
+      qty: Number(it.qty),
+      price: Number(it.price)
+    }));
+    if (!items.length) throw new Error("Carrinho vazio.");
+
+    const warehouse_id = whSel.value;
+    const ref_note = document.getElementById("posNote")?.value || "Venda POS";
+
+    // total
+    const total = items.reduce((a, it) => a + (it.qty * it.price), 0);
+
+    // recebido
+    const received = Number(document.getElementById("posPaid")?.value || 0);
+    const paid   = Math.min(received, total);
+    const change = Math.max(received - total, 0);
+    const due    = Math.max(total - received, 0);
+
+    // cliente (opcional)
+    const client_id = document.getElementById("posClient")?.value || null;
+
+    // 1) cria venda via RPC (baixa stock)
+    const sale_id = await DC_DB.createSale({
+      company_id,
+      branch_id,
+      warehouse_id,
+      items,
+      ref_note
+    });
+
+    // 2) status
+    const status = due > 0 ? (paid > 0 ? "PARTIAL" : "DUE") : "PAID";
+
+    // 3) atualiza venda (client opcional)
+    await DC_DB.supabase
+      .from("sales")
+      .update({ status, total, ref_note, client_id })
+      .eq("id", sale_id);
+
+    // 4) pagamento (safe)
+    const account_id = document.getElementById("posAccount")?.value || null;
+    const method = document.getElementById("posPayMethod")?.value || "cash";
+
+    if (paid > 0) {
+      // se a tabela não existir, não trava
+      try {
+        await DC_DB.supabase.from("sale_payments").insert({
+          company_id,
+          sale_id,
+          account_id,
+          method,
+          amount: paid,
+          created_by: DC_STATE.state.session.userId || null
+        });
+      } catch (e) {
+        console.warn("sale_payments não gravou:", e?.message || e);
+      }
+
+      if (account_id) {
+        await DC_DB.createCashMove({
+          company_id,
+          branch_id,
+          account_id,
+          move_type: "IN",
+          amount: paid,
+          ref_type: "sale",
+          ref_id: sale_id,
+          note: `Recebimento venda | ${ref_note}`
+        });
+      }
+    }
+
+    // 5) dívida (só se tiver cliente)
+    if (due > 0) {
+      if (!client_id) throw new Error("Pagamento parcial exige selecionar cliente.");
+      try {
+        await DC_DB.supabase.from("client_ledger").insert({
+          company_id,
+          client_id,
+          entry_type: "DEBIT",
+          amount: due,
+          ref_type: "sale",
+          ref_id: sale_id,
+          note: `Dívida da venda | ${ref_note}`,
+          created_by: DC_STATE.state.session.userId || null
+        });
+      } catch (e) {
+        console.warn("client_ledger não gravou:", e?.message || e);
+      }
+    }
+
+    // UI reset
+    cart.clear();
+    renderCart();
+
+    onHandMap = await getOnHandMap(warehouse_id);
+    renderProducts(document.getElementById("posSearch")?.value || "");
+
+    await STOCK_UI.refreshLowStockBadge();
+
+    if ($msg) {
+      $msg.textContent =
+        `✅ Venda: ${sale_id} | Total: ${money(total)} | Pago: ${money(paid)}`
+        + (due > 0 ? ` | Dívida: ${money(due)}` : "")
+        + (change > 0 ? ` | Troco: ${money(change)}` : "");
+    }
+
+    DC_HELPERS.toast("Venda finalizada!", "ok");
+  } catch (err) {
+    if ($msg) $msg.textContent = "❌ " + (err?.message || err);
+    DC_HELPERS.toast(err?.message || "Erro", "err");
+  }
+});
 
   // primeiro render
   renderProducts("");
   renderCart();
+
+          const bindOnce = (el, key, eventName, handler) => {
+  if (!el) return;
+  const k = `bound_${key}_${eventName}`;
+  if (el.dataset[k] === "1") return;
+  el.dataset[k] = "1";
+  el.addEventListener(eventName, handler);
+};
+          
 };
 
 
@@ -1340,7 +1468,7 @@ clientQ?.addEventListener("input", (e) => renderClients(e.target.value));
     <div class="divider"></div>
 
     <!-- TOP BAR -->
-    <div class="grid" style="grid-template-columns: 1fr 1fr; gap:12px">
+   <div class="grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px">
       <div class="card" style="padding:12px">
         <div class="subtitle subtitle--sm">Armazém (MVP fixo)</div>
         <select id="posWarehouse" style="width:100%;padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12)"></select>
@@ -1725,6 +1853,8 @@ clientQ?.addEventListener("input", (e) => renderClients(e.target.value));
 
           // init stock ao entrar
           if (route === "stock") DC_UI.stock.initStockScreen();
+           if (route === "sales") DC_UI.stock.initSalesScreen();
+
         });
       });
 
