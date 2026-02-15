@@ -1068,42 +1068,69 @@ async createCashMove({ company_id, branch_id, account_id, move_type, amount, ref
   whSel.innerHTML = whs.map(w => `<option value="${w.id}">${w.name}</option>`).join("");
   if (whHint) whHint.textContent = "Vender a partir do armazém selecionado.";
 
-  // 3) clientes (UMA VEZ SÓ)
-  const clientSel  = document.getElementById("posClient");
-  const clientQ    = document.getElementById("posClientSearch");
-  const clientHint = document.getElementById("posClientHint");
+ // ===== CLIENTES (safe) =====
+const clientSel  = document.getElementById("posClient");
+const clientQ    = document.getElementById("posClientSearch");
+const clientHint = document.getElementById("posClientHint");
 
-  let clients = [];
-  if (clientSel) {
-    const { data, error } = await sb
+let clients = [];
+
+const loadClientsSafe = async () => {
+  // tenta com phone; se falhar, cai para (id,name)
+  let r = await sb
+    .from("clients")
+    .select("id, name, phone")
+    .eq("company_id", company_id)
+    .order("name");
+
+  if (r.error) {
+    r = await sb
       .from("clients")
-      .select("id,name,phone")
+      .select("id, name")
       .eq("company_id", company_id)
       .order("name");
-    if (!error) clients = data || [];
-
-    const renderClients = (filterText = "") => {
-      const q = String(filterText || "").trim().toLowerCase();
-      const list = (clients || []).filter(c => {
-        const name = String(c.name || "").toLowerCase();
-        const phone = String(c.phone || "").toLowerCase();
-        return !q || name.includes(q) || phone.includes(q);
-      });
-
-      clientSel.innerHTML =
-        `<option value="">— Selecionar cliente —</option>` +
-        list.map(c => {
-          const label = `${c.name}${c.phone ? ` • ${c.phone}` : ""}`;
-          return `<option value="${c.id}">${label}</option>`;
-        }).join("");
-
-      if (clientHint) clientHint.textContent =
-        "Pagamento parcial cria dívida ligada ao cliente.";
-    };
-
-    renderClients("");
-    clientQ?.addEventListener("input", (e) => renderClients(e.target.value));
   }
+
+  if (r.error) throw r.error;
+  return r.data || [];
+};
+
+const renderClients = (filterText = "") => {
+  if (!clientSel) return;
+
+  const q = String(filterText || "").trim().toLowerCase();
+
+  const list = (clients || []).filter(c => {
+    const name = String(c.name || "").toLowerCase();
+    const phone = String(c.phone || "").toLowerCase();
+    return !q || name.includes(q) || phone.includes(q);
+  });
+
+  clientSel.innerHTML =
+    `<option value="">— Selecionar cliente —</option>` +
+    list.map(c => {
+      const label = `${c.name}${c.phone ? ` • ${c.phone}` : ""}`;
+      return `<option value="${c.id}">${label}</option>`;
+    }).join("");
+
+  if (clientHint) {
+    clientHint.textContent = list.length
+      ? "Pagamento parcial cria dívida ligada ao cliente."
+      : "⚠️ Sem clientes. Crie em Clientes.";
+  }
+};
+
+try {
+  clients = await loadClientsSafe();
+  renderClients("");
+} catch (e) {
+  clients = [];
+  if (clientHint) clientHint.textContent = "❌ Erro ao carregar clientes: " + (e?.message || e);
+  if (clientSel) clientSel.innerHTML = `<option value="">— Erro —</option>`;
+}
+
+clientQ?.addEventListener("input", (e) => renderClients(e.target.value));
+
 
   // 4) contas (cash_accounts) (se vier vazio, ok)
   const accSel = document.getElementById("posAccount");
