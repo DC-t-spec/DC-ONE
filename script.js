@@ -390,12 +390,12 @@ async createCashMove({ company_id, branch_id, account_id, move_type, amount, ref
   return true;
 },
 // =====================
-// CLIENTES (CRUD)
+// CLIENTES (CRUD) - SEM address/created_by
 // =====================
 async listClients(company_id, { include_inactive = false } = {}) {
   let q = supabase
     .from("clients")
-  .select("id,name,phone,email,is_active,created_at")
+    .select("id,name,phone,email,is_active,created_at")
     .eq("company_id", company_id)
     .order("name");
 
@@ -406,9 +406,7 @@ async listClients(company_id, { include_inactive = false } = {}) {
   return data || [];
 },
 
-async createClient({ company_id, name, phone, email, address }) {
-  const created_by = DC_STATE.state.session.userId || null;
-
+async createClient({ company_id, name, phone, email }) {
   const { data, error } = await supabase
     .from("clients")
     .insert({
@@ -416,33 +414,32 @@ async createClient({ company_id, name, phone, email, address }) {
       name,
       phone: phone || null,
       email: email || null,
-      is_active: true,
-      created_by
+      is_active: true
     })
-   .select("id,name,phone,email,is_active,created_at")
-
+    .select("id,name,phone,email,is_active,created_at")
     .single();
 
   if (error) throw error;
   return data;
 },
 
-async updateClient({ company_id, id, name, phone, email, address }) {
+async updateClient({ company_id, id, name, phone, email }) {
   const { data, error } = await supabase
     .from("clients")
     .update({
       name,
       phone: phone || null,
-      email: email || null,
+      email: email || null
     })
     .eq("company_id", company_id)
     .eq("id", id)
-   .select("id,name,phone,email,is_active,created_at")
+    .select("id,name,phone,email,is_active,created_at")
     .single();
 
   if (error) throw error;
   return data;
 },
+
 
 async setClientActive({ company_id, id, is_active }) {
   const { error } = await supabase
