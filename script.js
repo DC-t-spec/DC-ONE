@@ -1731,7 +1731,14 @@ const CLIENTS_UI = (() => {
   return { initClientsScreen };
 })();
 
-  return { refreshLowStockBadge, openLowStockModal, initStockScreen, initSalesScreen };
+ return {
+  refreshLowStockBadge,
+  openLowStockModal,
+  initStockScreen,
+  initSalesScreen,
+  clients: CLIENTS_UI
+};
+
 })();
 
 
@@ -2119,7 +2126,8 @@ if (u.currentRoute === "sales") {
       // expõe stock ui
       stock: STOCK_UI,
         // ✅ expõe clients ui
-  clients: CLIENTS_UI
+ clients: STOCK_UI.clients
+
     };
   })();
 
