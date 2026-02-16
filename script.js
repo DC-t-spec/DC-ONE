@@ -407,6 +407,8 @@ async listClients(company_id, { include_inactive = false } = {}) {
 },
 
 async createClient({ company_id, name, phone, email }) {
+  console.log("CREATE CLIENT PAYLOAD:", { company_id, name, phone, email });
+
   const { data, error } = await supabase
     .from("clients")
     .insert({
@@ -416,12 +418,16 @@ async createClient({ company_id, name, phone, email }) {
       email: email || null,
       is_active: true
     })
-    .select("id,name,phone,email,is_active,created_at")
-    .single();
+    .select("id,name,phone,email,is_active,created_at");
 
-  if (error) throw error;
-  return data;
-},
+  if (error) {
+    console.error("SUPABASE INSERT ERROR:", error);
+    throw new Error(error.message + (error.details ? ` | ${error.details}` : ""));
+  }
+
+  return (data && data[0]) || null;
+}
+
 
 async updateClient({ company_id, id, name, phone, email }) {
   const { data, error } = await supabase
@@ -1691,13 +1697,16 @@ const CLIENTS_UI = (() => {
           if (!name) throw new Error("Nome é obrigatório.");
 
           fm.textContent = "A guardar…";
+const company_id = DC_STATE.state.session.companyId;
+if (!company_id) throw new Error("Sessão sem companyId (UUID). Faz login novamente.");
 
-        await DC_DB.createClient({
+    await DC_DB.createClient({
   company_id,
   name,
   phone: (document.getElementById("cliPhone")?.value || "").trim(),
   email: (document.getElementById("cliEmail")?.value || "").trim()
 });
+
 
 
           close();
