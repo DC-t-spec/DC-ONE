@@ -243,6 +243,12 @@
     }
 
     const supabase = window.supabase.createClient(DC_CONFIG.SUPABASE_URL, DC_CONFIG.SUPABASE_ANON_KEY);
+     console.log("ANON KEY len:", (DC_CONFIG.SUPABASE_ANON_KEY || "").length);
+console.log("SUPA url:", DC_CONFIG.SUPABASE_URL);
+console.log("SUPA client ok?", !!supabase);
+
+supabase.from("clients").select("id").limit(1).then(r => console.log("select test:", r)).catch(console.error);
+
 
     const db = {
       async createCompany(company) {
@@ -424,10 +430,8 @@ async createClient({ company_id, name, phone }) {
 
   if (error) throw error;
   return data;
-},
-console.log("SUPA URL OK?", DC_CONFIG.SUPABASE_URL);
-console.log("SUPA KEY head:", (DC_CONFIG.SUPABASE_ANON_KEY || "").slice(0, 12));
-console.log("SUPA client:", !!DC_DB?.supabase);
+},  
+       
 
 
 
