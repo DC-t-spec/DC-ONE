@@ -425,6 +425,9 @@ async createClient({ company_id, name, phone }) {
   if (error) throw error;
   return data;
 },
+console.log("SUPA URL OK?", DC_CONFIG.SUPABASE_URL);
+console.log("SUPA KEY head:", (DC_CONFIG.SUPABASE_ANON_KEY || "").slice(0, 12));
+console.log("SUPA client:", !!DC_DB?.supabase);
 
 
 
