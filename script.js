@@ -426,7 +426,7 @@ async createClient({ company_id, name, phone, email }) {
   }
 
   return (data && data[0]) || null;
-}
+},
 
 
 async updateClient({ company_id, id, name, phone, email }) {
@@ -444,7 +444,7 @@ async updateClient({ company_id, id, name, phone, email }) {
 
   if (error) throw error;
   return data;
-},
+}
 
 
     };
