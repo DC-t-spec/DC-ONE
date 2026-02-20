@@ -415,24 +415,38 @@ async listClients(company_id, { include_inactive = false } = {}) {
 },
 
 
-async createClient({ company_id, name, phone }) {
-  const created_by = DC_STATE.state.session.userId || null;
+function isUUID(v) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v || "");
+}
+
+async createClient({ company_id, name, phone, email }) {
+  const rawCreatedBy = DC_STATE.state.session.userId || null;
+
+  const payload = {
+    company_id,
+    name,
+    phone: phone?.trim() ? phone.trim() : null,
+    email: email?.trim() ? email.trim() : null,   // só fica se existir coluna
+    is_active: true,
+    created_by: isUUID(rawCreatedBy) ? rawCreatedBy : null
+  };
+
+  // se a tua tabela NÃO tiver coluna email, apaga esta linha:
+  // delete payload.email;
 
   const { data, error } = await supabase
     .from("clients")
-    .insert({
-      company_id,
-      name,
-      phone: phone || null,
-      is_active: true,
-      created_by
-    })
+    .insert([payload])        // usa array (mais consistente no PostgREST)
     .select("id,name,phone,is_active,created_at")
     .single();
 
-  if (error) throw error;
+  if (error) {
+    console.log("createClient error:", error);
+    console.log("payload:", payload);
+    throw error;
+  }
   return data;
-},  
+}
        
 
 
