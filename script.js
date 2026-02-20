@@ -243,6 +243,8 @@
     }
 
     const supabase = window.supabase.createClient(DC_CONFIG.SUPABASE_URL, DC_CONFIG.SUPABASE_ANON_KEY);
+     window.DC_SUPA = supabase;          // expõe para o Console
+window.DC_CONFIG = DC_CONFIG;       // opcional, ajuda debug
      console.log("ANON KEY len:", (DC_CONFIG.SUPABASE_ANON_KEY || "").length);
 console.log("SUPA url:", DC_CONFIG.SUPABASE_URL);
 console.log("SUPA client ok?", !!supabase);
