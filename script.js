@@ -398,71 +398,52 @@ async createCashMove({ company_id, branch_id, account_id, move_type, amount, ref
   return true;
 },
 // =====================
-// CLIENTES (CRUD) - FIX
+// CLIENTES (CRUD) - schema-safe
 // =====================
-isUUID(v) {
+function isUUID(v) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v || "");
-},
+}
 
-async createClient({ company_id, name, phone, email, address }) {
-  const rawCreatedBy = DC_STATE.state.session.userId || null;
+// Detecta colunas existentes (cache local para não fazer 1000 queries)
+let _clientsColsCache = null;
+async function getClientsColsSafe() {
+  if (_clientsColsCache) return _clientsColsCache;
 
-  const payload = {
-    company_id,
-    name: String(name || "").trim(),
-    phone: String(phone || "").trim() || null,
-    email: String(email || "").trim() || null,     // se não existir coluna, remove esta linha
-    address: String(address || "").trim() || null, // se não existir coluna, remove esta linha
-    is_active: true,
-    created_by: this.isUUID(rawCreatedBy) ? rawCreatedBy : null
-  };
+  // Método 1 (recomendado): tabela de metadados via RPC ou view (se tiveres)
+  // Como não temos, fazemos fallback “por tentativa”:
+  const cols = { email: false, address: false, created_by: false };
 
-  // Se a tua tabela clients NÃO tiver email/address, faz:
-  // delete payload.email;
-  // delete payload.address;
-
-  const { data, error } = await supabase
-    .from("clients")
-    .insert([payload])
-    .select("id,name,phone,email,address,is_active,created_at") // ajusta conforme colunas
-    .single();
-
-  if (error) {
-    console.log("createClient error:", error);
-    console.log("payload:", payload);
-    throw error;
+  // Testa email
+  {
+    const r = await supabase.from("clients").select("email").limit(1);
+    cols.email = !r.error;
   }
-  return data;
-},
+  // Testa address
+  {
+    const r = await supabase.from("clients").select("address").limit(1);
+    cols.address = !r.error;
+  }
+  // Testa created_by
+  {
+    const r = await supabase.from("clients").select("created_by").limit(1);
+    cols.created_by = !r.error;
+  }
 
-async updateClient({ company_id, id, name, phone, email, address }) {
-  const payload = {
-    name: String(name || "").trim(),
-    phone: String(phone || "").trim() || null,
-    email: String(email || "").trim() || null,     // se não existir coluna, comenta/remove
-    address: String(address || "").trim() || null  // se não existir coluna, comenta/remove
-  };
+  _clientsColsCache = cols;
+  return cols;
+}
 
-  // Se a tua tabela clients NÃO tiver email/address, faz:
-  // delete payload.email;
-  // delete payload.address;
+async function listClients(company_id, { include_inactive = false } = {}) {
+  const cols = await getClientsColsSafe();
 
-  const { data, error } = await supabase
-    .from("clients")
-    .update(payload)
-    .eq("company_id", company_id)
-    .eq("id", id)
-    .select("id,name,phone,email,address,is_active,created_at") // ajusta conforme colunas
-    .single();
+  // monta select dinamicamente
+  const fields = ["id", "name", "phone", "is_active", "created_at"];
+  if (cols.email) fields.push("email");
+  if (cols.address) fields.push("address");
 
-  if (error) throw error;
-  return data;
-},
-
-async listClients(company_id, { include_inactive = false } = {}) {
   let q = supabase
     .from("clients")
-    .select("id,name,phone,email,address,is_active,created_at")
+    .select(fields.join(","))
     .eq("company_id", company_id)
     .order("name");
 
@@ -471,19 +452,78 @@ async listClients(company_id, { include_inactive = false } = {}) {
   const { data, error } = await q;
   if (error) throw error;
   return data || [];
-},
+}
 
-async setClientActive({ company_id, id, is_active }) {
+async function createClient({ company_id, name, phone, email, address }) {
+  const cols = await getClientsColsSafe();
+
+  const rawCreatedBy = DC_STATE.state.session.userId || null;
+
+  const payload = {
+    company_id,
+    name: String(name || "").trim(),
+    phone: String(phone || "").trim() || null,
+    is_active: true
+  };
+
+  if (cols.email) payload.email = String(email || "").trim() || null;
+  if (cols.address) payload.address = String(address || "").trim() || null;
+  if (cols.created_by) payload.created_by = isUUID(rawCreatedBy) ? rawCreatedBy : null;
+
+  const fields = ["id", "name", "phone", "is_active", "created_at"];
+  if (cols.email) fields.push("email");
+  if (cols.address) fields.push("address");
+
+  const { data, error } = await supabase
+    .from("clients")
+    .insert([payload])
+    .select(fields.join(","))
+    .single();
+
+  if (error) {
+    console.log("createClient error:", error);
+    console.log("payload:", payload);
+    throw error;
+  }
+  return data;
+}
+
+async function updateClient({ company_id, id, name, phone, email, address }) {
+  const cols = await getClientsColsSafe();
+
+  const payload = {
+    name: String(name || "").trim(),
+    phone: String(phone || "").trim() || null
+  };
+
+  if (cols.email) payload.email = String(email || "").trim() || null;
+  if (cols.address) payload.address = String(address || "").trim() || null;
+
+  const fields = ["id", "name", "phone", "is_active", "created_at"];
+  if (cols.email) fields.push("email");
+  if (cols.address) fields.push("address");
+
+  const { data, error } = await supabase
+    .from("clients")
+    .update(payload)
+    .eq("company_id", company_id)
+    .eq("id", id)
+    .select(fields.join(","))
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+async function setClientActive({ company_id, id, is_active }) {
   const { error } = await supabase
     .from("clients")
     .update({ is_active: !!is_active })
     .eq("company_id", company_id)
     .eq("id", id);
-
   if (error) throw error;
   return true;
-},
-
+}
     };
 
     window.addEventListener("unhandledrejection", (e) => {
@@ -492,7 +532,23 @@ async setClientActive({ company_id, id, is_active }) {
       toast(msg, "err");
     });
 
-    return api;
+   return {
+  supabase,
+  createCompanyWithAdmin,
+  login,
+  restore,
+  logout,
+  transferStock,
+  createSale,
+  listCashAccounts,
+  createCashMove,
+
+  // clientes
+  listClients,
+  createClient,
+  updateClient,
+  setClientActive
+};
   })();
 
   /* =======================
@@ -1664,12 +1720,13 @@ const CLIENTS_UI = (() => {
 
               fm.textContent = "A guardar…";
 
-           await DC_DB.updateClient({
+         await DC_DB.updateClient({
   company_id,
   id: client.id,
   name,
   phone: (document.getElementById("cliPhone")?.value || "").trim(),
-  email: (document.getElementById("cliEmail")?.value || "").trim()
+  email: (document.getElementById("cliEmail")?.value || "").trim(),
+  address: (document.getElementById("cliAddress")?.value || "").trim()
 });
 
 
@@ -1737,11 +1794,12 @@ const CLIENTS_UI = (() => {
 const company_id = DC_STATE.state.session.companyId;
 if (!company_id) throw new Error("Sessão sem companyId (UUID). Faz login novamente.");
 
-    await DC_DB.createClient({
+   await DC_DB.createClient({
   company_id,
   name,
   phone: (document.getElementById("cliPhone")?.value || "").trim(),
-  email: (document.getElementById("cliEmail")?.value || "").trim()
+  email: (document.getElementById("cliEmail")?.value || "").trim(),
+  address: (document.getElementById("cliAddress")?.value || "").trim()
 });
 
 
