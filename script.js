@@ -398,55 +398,33 @@ async createCashMove({ company_id, branch_id, account_id, move_type, amount, ref
   return true;
 },
 // =====================
-// CLIENTES (CRUD)
+// CLIENTES (CRUD) - FIX
 // =====================
-async createClient({ company_id, name, phone, email }) {
-  const rawCreatedBy = DC_STATE.state.session.userId || null;
-
-  const payload = {
-    company_id,
-    name,
-    phone: phone?.trim() ? phone.trim() : null,
-    // email só se existir coluna:
-    // email: email?.trim() ? email.trim() : null,
-    is_active: true,
-    created_by: this.isUUID(rawCreatedBy) ? rawCreatedBy : null
-  };
-
-  const { data, error } = await supabase
-    .from("clients")
-    .insert([payload])
-    .select("id,name,phone,is_active,created_at")
-    .single();
-
-  if (error) throw error;
-  return data;
-},
-
-
 isUUID(v) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v || "");
 },
 
-async createClient({ company_id, name, phone, email }) {
+async createClient({ company_id, name, phone, email, address }) {
   const rawCreatedBy = DC_STATE.state.session.userId || null;
 
   const payload = {
     company_id,
-    name,
-    phone: phone?.trim() ? phone.trim() : null,
-    email: email?.trim() ? email.trim() : null,   // só fica se existir coluna
+    name: String(name || "").trim(),
+    phone: String(phone || "").trim() || null,
+    email: String(email || "").trim() || null,     // se não existir coluna, remove esta linha
+    address: String(address || "").trim() || null, // se não existir coluna, remove esta linha
     is_active: true,
-    created_by: isUUID(rawCreatedBy) ? rawCreatedBy : null
+    created_by: this.isUUID(rawCreatedBy) ? rawCreatedBy : null
   };
 
-  // se a tua tabela NÃO tiver coluna email, apaga esta linha:
+  // Se a tua tabela clients NÃO tiver email/address, faz:
   // delete payload.email;
+  // delete payload.address;
 
   const { data, error } = await supabase
     .from("clients")
-    .insert([payload])        // usa array (mais consistente no PostgREST)
-    .select("id,name,phone,is_active,created_at")
+    .insert([payload])
+    .select("id,name,phone,email,address,is_active,created_at") // ajusta conforme colunas
     .single();
 
   if (error) {
@@ -455,31 +433,56 @@ async createClient({ company_id, name, phone, email }) {
     throw error;
   }
   return data;
-}
-       
+},
 
-
-
-async updateClient({ company_id, id, name, phone, email }) {
+async updateClient({ company_id, id, name, phone, email, address }) {
   const payload = {
-    name,
-    phone: phone?.trim() ? phone.trim() : null,
-    // só se a coluna existir:
-    // email: email?.trim() ? email.trim() : null,
+    name: String(name || "").trim(),
+    phone: String(phone || "").trim() || null,
+    email: String(email || "").trim() || null,     // se não existir coluna, comenta/remove
+    address: String(address || "").trim() || null  // se não existir coluna, comenta/remove
   };
+
+  // Se a tua tabela clients NÃO tiver email/address, faz:
+  // delete payload.email;
+  // delete payload.address;
 
   const { data, error } = await supabase
     .from("clients")
     .update(payload)
     .eq("company_id", company_id)
     .eq("id", id)
-    .select("id,name,phone,is_active,created_at")
+    .select("id,name,phone,email,address,is_active,created_at") // ajusta conforme colunas
     .single();
 
   if (error) throw error;
   return data;
 },
 
+async listClients(company_id, { include_inactive = false } = {}) {
+  let q = supabase
+    .from("clients")
+    .select("id,name,phone,email,address,is_active,created_at")
+    .eq("company_id", company_id)
+    .order("name");
+
+  if (!include_inactive) q = q.eq("is_active", true);
+
+  const { data, error } = await q;
+  if (error) throw error;
+  return data || [];
+},
+
+async setClientActive({ company_id, id, is_active }) {
+  const { error } = await supabase
+    .from("clients")
+    .update({ is_active: !!is_active })
+    .eq("company_id", company_id)
+    .eq("id", id);
+
+  if (error) throw error;
+  return true;
+},
 
     };
 
