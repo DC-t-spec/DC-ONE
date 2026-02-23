@@ -1,16 +1,3 @@
-/* =========================================================
-   DC ONE - script.js (8 partes num ficheiro)
-   Ordem interna:
-   1) CONFIG
-   2) STATE/DB (state)
-   3) HELPERS
-   4) DB (load/save) + Supabase
-   5) LOGIC (auth + stock logic)
-   6) UI (routes + stock ui)
-   7) EVENTS
-   8) START/INIT
-========================================================= */
-
 (() => {
   "use strict";
 
@@ -19,25 +6,37 @@
   ======================= */
   const DC_CONFIG = {
     SUPABASE_URL: "https://jnovwijxuplrcjbtnerc.supabase.co",
-    SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impub3Z3aWp4dXBscmNqYnRuZXJjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA5MTI0MjcsImV4cCI6MjA4NjQ4ODQyN30.99oSvJ94iq4IfukLQTCFi5DvdAPbooDV4Ll9KgAuGD0",
+    SUPABASE_ANON_KEY:
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impub3Z3aWp4dXBscmNqYnRuZXJjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA5MTI0MjcsImV4cCI6MjA4NjQ4ODQyN30.99oSvJ94iq4IfukLQTCFi5DvdAPbooDV4Ll9KgAuGD0",
 
     AUTH_EMAIL_DOMAIN: "dc",
     PLANS: ["basic", "pro", "inteligente"],
 
     BRANCHES: [
-      "Mercearia", "Bottle Store", "Farmácia", "Restaurante", "Pastelaria / Café",
-      "Hotel", "Guest House", "Armazém e Distribuição", "Oficina", "Salão",
-      "Clínica", "Avicultura", "Agricultura", "Incubadora (salas/estúdios/co-work)"
+      "Mercearia",
+      "Bottle Store",
+      "Farmácia",
+      "Restaurante",
+      "Pastelaria / Café",
+      "Hotel",
+      "Guest House",
+      "Armazém e Distribuição",
+      "Oficina",
+      "Salão",
+      "Clínica",
+      "Avicultura",
+      "Agricultura",
+      "Incubadora (salas/estúdios/co-work)",
     ],
 
     TEMPLATE_MODULES: {
       default: ["dashboard", "sales", "stock", "cash", "clients", "suppliers", "reports", "settings"],
       "Incubadora (salas/estúdios/co-work)": ["dashboard", "bookings", "clients", "cash", "reports", "settings"],
-      "Hotel": ["dashboard", "bookings", "clients", "cash", "stock", "reports", "settings"],
-      "Clínica": ["dashboard", "patients", "appointments", "cash", "reports", "settings"],
-      "Avicultura": ["dashboard", "production", "stock", "sales", "cash", "reports", "settings"],
-      "Agricultura": ["dashboard", "production", "stock", "sales", "cash", "reports", "settings"]
-    }
+      Hotel: ["dashboard", "bookings", "clients", "cash", "stock", "reports", "settings"],
+      Clínica: ["dashboard", "patients", "appointments", "cash", "reports", "settings"],
+      Avicultura: ["dashboard", "production", "stock", "sales", "cash", "reports", "settings"],
+      Agricultura: ["dashboard", "production", "stock", "sales", "cash", "reports", "settings"],
+    },
   };
 
   /* =======================
@@ -54,16 +53,20 @@
         role: null,
         plan: null,
         branch: null,
-        companyName: null
+        companyName: null,
       },
       ui: {
-        currentScreen: "lock",   // lock | onboard | app
+        currentScreen: "lock", // lock | onboard | app
         currentRoute: "dashboard",
-        modules: []
-      }
+        modules: [],
+      },
     },
-    setSession(patch) { Object.assign(this.state.session, patch); },
-    setUI(patch) { Object.assign(this.state.ui, patch); },
+    setSession(patch) {
+      Object.assign(this.state.session, patch);
+    },
+    setUI(patch) {
+      Object.assign(this.state.ui, patch);
+    },
     resetSession() {
       this.state.session = {
         isAuthed: false,
@@ -74,9 +77,9 @@
         role: null,
         plan: null,
         branch: null,
-        companyName: null
+        companyName: null,
       };
-    }
+    },
   };
 
   /* =======================
@@ -101,14 +104,16 @@
       const map = DC_CONFIG.TEMPLATE_MODULES;
       return map[branch] || map.default;
     };
-const bindOnce = (el, key, eventName, handler) => {
-  if (!el) return;
-  // dataset com chave “segura” (sem caracteres estranhos)
-  const k = `dcBound${String(key).replace(/\W/g, "")}${eventName}`;
-  if (el.dataset[k] === "1") return;
-  el.dataset[k] = "1";
-  el.addEventListener(eventName, handler);
-};
+
+    // ✅ bindOnce único (usado em todo o app)
+    const bindOnce = (el, key, eventName, handler) => {
+      if (!el) return;
+      const k = `dcBound_${String(key).replace(/\W/g, "")}_${eventName}`;
+      if (el.dataset[k] === "1") return;
+      el.dataset[k] = "1";
+      el.addEventListener(eventName, handler);
+    };
+
     const toast = (msg, type = "info") => {
       const wrapId = "toastWrap";
       let wrap = document.getElementById(wrapId);
@@ -202,7 +207,9 @@ const bindOnce = (el, key, eventName, handler) => {
 
       const close = () => overlay.remove();
       document.getElementById("dcCloseCompanyId")?.addEventListener("click", close);
-      overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
+      overlay.addEventListener("click", (e) => {
+        if (e.target === overlay) close();
+      });
 
       document.getElementById("dcCopyCompanyId")?.addEventListener("click", async () => {
         try {
@@ -233,14 +240,17 @@ const bindOnce = (el, key, eventName, handler) => {
     };
 
     return {
-      $, $$, sanitize, slug,
-      generateCompanyCode, makeAuthEmail, pickModulesForBranch,
-      toast, showCompanyIdModal, applyLastCompanyIdToLogin,
-       
-  $, $$, sanitize, slug,
-  generateCompanyCode, makeAuthEmail, pickModulesForBranch,
-  toast, showCompanyIdModal, applyLastCompanyIdToLogin,
-  bindOnce
+      $,
+      $$,
+      sanitize,
+      slug,
+      generateCompanyCode,
+      makeAuthEmail,
+      pickModulesForBranch,
+      toast,
+      showCompanyIdModal,
+      applyLastCompanyIdToLogin,
+      bindOnce,
     };
   })();
 
@@ -255,14 +265,21 @@ const bindOnce = (el, key, eventName, handler) => {
     }
 
     const supabase = window.supabase.createClient(DC_CONFIG.SUPABASE_URL, DC_CONFIG.SUPABASE_ANON_KEY);
-     window.DC_SUPA = supabase;          // expõe para o Console
-window.DC_CONFIG = DC_CONFIG;       // opcional, ajuda debug
-     console.log("ANON KEY len:", (DC_CONFIG.SUPABASE_ANON_KEY || "").length);
-console.log("SUPA url:", DC_CONFIG.SUPABASE_URL);
-console.log("SUPA client ok?", !!supabase);
 
-supabase.from("clients").select("id").limit(1).then(r => console.log("select test:", r)).catch(console.error);
+    // debug (não quebra)
+    window.DC_SUPA = supabase;
+    window.DC_CONFIG = DC_CONFIG;
+    console.log("ANON KEY len:", (DC_CONFIG.SUPABASE_ANON_KEY || "").length);
+    console.log("SUPA url:", DC_CONFIG.SUPABASE_URL);
+    console.log("SUPA client ok?", !!supabase);
 
+    // ⚠️ Se isto te estiver a spammar o console, podes comentar
+    supabase
+      .from("clients")
+      .select("id")
+      .limit(1)
+      .then((r) => console.log("select test:", r))
+      .catch(console.error);
 
     const db = {
       async createCompany(company) {
@@ -283,7 +300,7 @@ supabase.from("clients").select("id").limit(1).then(r => console.log("select tes
           .maybeSingle();
         if (error) throw error;
         return data;
-      }
+      },
     };
 
     const auth = {
@@ -307,7 +324,7 @@ supabase.from("clients").select("id").limit(1).then(r => console.log("select tes
       async signOut() {
         const { error } = await supabase.auth.signOut();
         if (error) throw error;
-      }
+      },
     };
 
     const api = {
@@ -315,6 +332,7 @@ supabase.from("clients").select("id").limit(1).then(r => console.log("select tes
 
       async createCompanyWithAdmin({ company, admin }) {
         const createdCompany = await db.createCompany(company);
+
         const signUpRes = await auth.signUp(createdCompany.company_code, admin.username, admin.pass);
 
         const user = signUpRes?.user;
@@ -325,7 +343,7 @@ supabase.from("clients").select("id").limit(1).then(r => console.log("select tes
           company_id: createdCompany.id,
           full_name: admin.fullName || null,
           username: admin.username,
-          role: "Admin"
+          role: "Admin",
         });
 
         return createdCompany;
@@ -362,183 +380,163 @@ supabase.from("clients").select("id").limit(1).then(r => console.log("select tes
           p_to_warehouse_id: to_warehouse_id,
           p_product_id: product_id,
           p_qty: qty,
-          p_ref_note: ref_note ?? null
+          p_ref_note: ref_note ?? null,
         });
         if (error) throw error;
         return data;
       },
-       async createSale({ company_id, branch_id, warehouse_id, items, ref_note }) {
-  const created_by = DC_STATE.state.session.userId || null;
 
-  const { data, error } = await supabase.rpc("dc_create_sale", {
-    p_company_id: company_id,
-    p_branch_id: branch_id,
-    p_warehouse_id: warehouse_id,
-    p_items: items,            // array JS vira jsonb
-    p_ref_note: ref_note ?? null,
-    p_created_by: created_by
-  });
-  if (error) throw error;
-  return data; // sale_id
-},
-async listCashAccounts(company_id) {
-  const { data, error } = await supabase
-    .from("cash_accounts")
-    .select("id,name,type")
-    .eq("company_id", company_id)
-    .eq("is_active", true)
-    .order("name");
-  if (error) throw error;
-  return data || [];
-},
+      async createSale({ company_id, branch_id, warehouse_id, items, ref_note }) {
+        const created_by = DC_STATE.state.session.userId || null;
 
-async createCashMove({ company_id, branch_id, account_id, move_type, amount, ref_type, ref_id, note }) {
-  const created_by = DC_STATE.state.session.userId || null;
+        const { data, error } = await supabase.rpc("dc_create_sale", {
+          p_company_id: company_id,
+          p_branch_id: branch_id,
+          p_warehouse_id: warehouse_id,
+          p_items: items,
+          p_ref_note: ref_note ?? null,
+          p_created_by: created_by,
+        });
+        if (error) throw error;
+        return data; // sale_id
+      },
 
-  const { error } = await supabase.from("cash_moves").insert({
-    company_id,
-    branch_id,
-    account_id,
-    move_type,
-    amount,
-    ref_type,
-    ref_id: ref_id ?? null,
-    note: note ?? null,
-    created_by
-  });
-  if (error) throw error;
-  return true;
-},
-       };
-     
-// =====================
-// CLIENTES (CRUD) - schema-safe
-// =====================
-function isUUID(v) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v || "");
-}
+      async listCashAccounts(company_id) {
+        const { data, error } = await supabase
+          .from("cash_accounts")
+          .select("id,name,type")
+          .eq("company_id", company_id)
+          .eq("is_active", true)
+          .order("name");
+        if (error) throw error;
+        return data || [];
+      },
 
-// Detecta colunas existentes (cache local para não fazer 1000 queries)
-let _clientsColsCache = null;
-async function getClientsColsSafe() {
-  if (_clientsColsCache) return _clientsColsCache;
+      async createCashMove({ company_id, branch_id, account_id, move_type, amount, ref_type, ref_id, note }) {
+        const created_by = DC_STATE.state.session.userId || null;
 
-  // Método 1 (recomendado): tabela de metadados via RPC ou view (se tiveres)
-  // Como não temos, fazemos fallback “por tentativa”:
-  const cols = { email: false, address: false, created_by: false };
-
-  // Testa email
-  {
-    const r = await supabase.from("clients").select("email").limit(1);
-    cols.email = !r.error;
-  }
-  // Testa address
-  {
-    const r = await supabase.from("clients").select("address").limit(1);
-    cols.address = !r.error;
-  }
-  // Testa created_by
-  {
-    const r = await supabase.from("clients").select("created_by").limit(1);
-    cols.created_by = !r.error;
-  }
-
-  _clientsColsCache = cols;
-  return cols;
-}
-
-async function listClients(company_id, { include_inactive = false } = {}) {
-  const cols = await getClientsColsSafe();
-
-  // monta select dinamicamente
-  const fields = ["id", "name", "phone", "is_active", "created_at"];
-  if (cols.email) fields.push("email");
-  if (cols.address) fields.push("address");
-
-  let q = supabase
-    .from("clients")
-    .select(fields.join(","))
-    .eq("company_id", company_id)
-    .order("name");
-
-  if (!include_inactive) q = q.eq("is_active", true);
-
-  const { data, error } = await q;
-  if (error) throw error;
-  return data || [];
-}
-
-async function createClient({ company_id, name, phone, email, address }) {
-  const cols = await getClientsColsSafe();
-
-  const rawCreatedBy = DC_STATE.state.session.userId || null;
-
-  const payload = {
-    company_id,
-    name: String(name || "").trim(),
-    phone: String(phone || "").trim() || null,
-    is_active: true
-  };
-
-  if (cols.email) payload.email = String(email || "").trim() || null;
-  if (cols.address) payload.address = String(address || "").trim() || null;
-  if (cols.created_by) payload.created_by = isUUID(rawCreatedBy) ? rawCreatedBy : null;
-
-  const fields = ["id", "name", "phone", "is_active", "created_at"];
-  if (cols.email) fields.push("email");
-  if (cols.address) fields.push("address");
-
-  const { data, error } = await supabase
-    .from("clients")
-    .insert([payload])
-    .select(fields.join(","))
-    .single();
-
-  if (error) {
-    console.log("createClient error:", error);
-    console.log("payload:", payload);
-    throw error;
-  }
-  return data;
-}
-
-async function updateClient({ company_id, id, name, phone, email, address }) {
-  const cols = await getClientsColsSafe();
-
-  const payload = {
-    name: String(name || "").trim(),
-    phone: String(phone || "").trim() || null
-  };
-
-  if (cols.email) payload.email = String(email || "").trim() || null;
-  if (cols.address) payload.address = String(address || "").trim() || null;
-
-  const fields = ["id", "name", "phone", "is_active", "created_at"];
-  if (cols.email) fields.push("email");
-  if (cols.address) fields.push("address");
-
-  const { data, error } = await supabase
-    .from("clients")
-    .update(payload)
-    .eq("company_id", company_id)
-    .eq("id", id)
-    .select(fields.join(","))
-    .single();
-
-  if (error) throw error;
-  return data;
-}
-
-async function setClientActive({ company_id, id, is_active }) {
-  const { error } = await supabase
-    .from("clients")
-    .update({ is_active: !!is_active })
-    .eq("company_id", company_id)
-    .eq("id", id);
-  if (error) throw error;
-  return true;
-}
+        const { error } = await supabase.from("cash_moves").insert({
+          company_id,
+          branch_id,
+          account_id,
+          move_type,
+          amount,
+          ref_type,
+          ref_id: ref_id ?? null,
+          note: note ?? null,
+          created_by,
+        });
+        if (error) throw error;
+        return true;
+      },
     };
+
+    // =====================
+    // CLIENTES (CRUD) - schema-safe
+    // =====================
+    function isUUID(v) {
+      return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v || "");
+    }
+
+    let _clientsColsCache = null;
+    async function getClientsColsSafe() {
+      if (_clientsColsCache) return _clientsColsCache;
+
+      const cols = { email: false, address: false, created_by: false };
+
+      {
+        const r = await supabase.from("clients").select("email").limit(1);
+        cols.email = !r.error;
+      }
+      {
+        const r = await supabase.from("clients").select("address").limit(1);
+        cols.address = !r.error;
+      }
+      {
+        const r = await supabase.from("clients").select("created_by").limit(1);
+        cols.created_by = !r.error;
+      }
+
+      _clientsColsCache = cols;
+      return cols;
+    }
+
+    async function listClients(company_id, { include_inactive = false } = {}) {
+      const cols = await getClientsColsSafe();
+
+      const fields = ["id", "name", "phone", "is_active", "created_at"];
+      if (cols.email) fields.push("email");
+      if (cols.address) fields.push("address");
+
+      let q = supabase.from("clients").select(fields.join(",")).eq("company_id", company_id).order("name");
+      if (!include_inactive) q = q.eq("is_active", true);
+
+      const { data, error } = await q;
+      if (error) throw error;
+      return data || [];
+    }
+
+    async function createClient({ company_id, name, phone, email, address }) {
+      const cols = await getClientsColsSafe();
+      const rawCreatedBy = DC_STATE.state.session.userId || null;
+
+      const payload = {
+        company_id,
+        name: String(name || "").trim(),
+        phone: String(phone || "").trim() || null,
+        is_active: true,
+      };
+
+      if (cols.email) payload.email = String(email || "").trim() || null;
+      if (cols.address) payload.address = String(address || "").trim() || null;
+      if (cols.created_by) payload.created_by = isUUID(rawCreatedBy) ? rawCreatedBy : null;
+
+      const fields = ["id", "name", "phone", "is_active", "created_at"];
+      if (cols.email) fields.push("email");
+      if (cols.address) fields.push("address");
+
+      const { data, error } = await supabase.from("clients").insert([payload]).select(fields.join(",")).single();
+
+      if (error) {
+        console.log("createClient error:", error);
+        console.log("payload:", payload);
+        throw error;
+      }
+      return data;
+    }
+
+    async function updateClient({ company_id, id, name, phone, email, address }) {
+      const cols = await getClientsColsSafe();
+
+      const payload = {
+        name: String(name || "").trim(),
+        phone: String(phone || "").trim() || null,
+      };
+
+      if (cols.email) payload.email = String(email || "").trim() || null;
+      if (cols.address) payload.address = String(address || "").trim() || null;
+
+      const fields = ["id", "name", "phone", "is_active", "created_at"];
+      if (cols.email) fields.push("email");
+      if (cols.address) fields.push("address");
+
+      const { data, error } = await supabase
+        .from("clients")
+        .update(payload)
+        .eq("company_id", company_id)
+        .eq("id", id)
+        .select(fields.join(","))
+        .single();
+
+      if (error) throw error;
+      return data;
+    }
+
+    async function setClientActive({ company_id, id, is_active }) {
+      const { error } = await supabase.from("clients").update({ is_active: !!is_active }).eq("company_id", company_id).eq("id", id);
+      if (error) throw error;
+      return true;
+    }
 
     window.addEventListener("unhandledrejection", (e) => {
       const msg = e?.reason?.message || "Erro inesperado.";
@@ -546,23 +544,23 @@ async function setClientActive({ company_id, id, is_active }) {
       toast(msg, "err");
     });
 
- return {
-  supabase: api.supabase,
-  createCompanyWithAdmin: api.createCompanyWithAdmin,
-  login: api.login,
-  restore: api.restore,
-  logout: api.logout,
-  transferStock: api.transferStock,
-  createSale: api.createSale,
-  listCashAccounts: api.listCashAccounts,
-  createCashMove: api.createCashMove,
+    return {
+      supabase: api.supabase,
+      createCompanyWithAdmin: api.createCompanyWithAdmin,
+      login: api.login,
+      restore: api.restore,
+      logout: api.logout,
+      transferStock: api.transferStock,
+      createSale: api.createSale,
+      listCashAccounts: api.listCashAccounts,
+      createCashMove: api.createCashMove,
 
-  // clientes
-  listClients,
-  createClient,
-  updateClient,
-  setClientActive
-};
+      // clientes
+      listClients,
+      createClient,
+      updateClient,
+      setClientActive,
+    };
   })();
 
   /* =======================
@@ -596,13 +594,13 @@ async function setClientActive({ company_id, id, is_active }) {
           phone: sanitize(formData.phone) || null,
           address: sanitize(formData.address) || null,
           city: sanitize(formData.city) || null,
-          country: sanitize(formData.country) || null
+          country: sanitize(formData.country) || null,
         };
 
         const admin = {
           fullName: sanitize(formData.adminFullName) || null,
           username: sanitize(formData.adminUser),
-          pass: formData.adminPass
+          pass: formData.adminPass,
         };
 
         const createdCompany = await DC_DB.createCompanyWithAdmin({ company, admin });
@@ -628,13 +626,13 @@ async function setClientActive({ company_id, id, is_active }) {
           role: res.profile.role,
           plan: comp.plan,
           branch: comp.branch,
-          companyName: comp.name
+          companyName: comp.name,
         });
 
         DC_STATE.setUI({
           currentScreen: "app",
           currentRoute: "dashboard",
-          modules
+          modules,
         });
 
         return true;
@@ -658,13 +656,13 @@ async function setClientActive({ company_id, id, is_active }) {
           role: res.profile.role,
           plan: comp.plan,
           branch: comp.branch,
-          companyName: comp.name
+          companyName: comp.name,
         });
 
         DC_STATE.setUI({
           currentScreen: "app",
           currentRoute: "dashboard",
-          modules
+          modules,
         });
 
         DC_HELPERS.toast("Login com sucesso.", "ok");
@@ -687,13 +685,13 @@ async function setClientActive({ company_id, id, is_active }) {
           role: restored.profile.role,
           plan: comp.plan,
           branch: comp.branch,
-          companyName: comp.name
+          companyName: comp.name,
         });
 
         DC_STATE.setUI({
           currentScreen: "app",
           currentRoute: "dashboard",
-          modules
+          modules,
         });
 
         return true;
@@ -704,7 +702,7 @@ async function setClientActive({ company_id, id, is_active }) {
         DC_STATE.resetSession();
         DC_STATE.setUI({ currentScreen: "lock", currentRoute: "dashboard", modules: [] });
         DC_HELPERS.toast("Sessão terminada.", "info");
-      }
+      },
     };
   })();
 
@@ -715,23 +713,22 @@ async function setClientActive({ company_id, id, is_active }) {
     const sb = () => DC_DB.supabase;
 
     async function createStockOut({ company_id, branch_id, warehouse_id, product_id, qty, note }) {
-      const { data: product, error } = await sb()
-        .from("products")
-        .select("id, product_type")
-        .eq("id", product_id)
-        .single();
+      const { data: product, error } = await sb().from("products").select("id, product_type").eq("id", product_id).single();
       if (error) throw error;
 
       const created_by = DC_STATE.state.session.userId || null;
 
       if (product.product_type === "SIMPLE") {
         const { error: e2 } = await sb().from("stock_moves").insert({
-          company_id, branch_id, warehouse_id, product_id,
+          company_id,
+          branch_id,
+          warehouse_id,
+          product_id,
           move_type: "OUT",
           qty,
           ref_type: "manual",
           ref_note: note || null,
-          created_by
+          created_by,
         });
         if (e2) throw e2;
         return true;
@@ -746,13 +743,15 @@ async function setClientActive({ company_id, id, is_active }) {
       if (!components || components.length === 0) throw new Error("Este kit não possui componentes definidos.");
 
       const moves = components.map((c) => ({
-        company_id, branch_id, warehouse_id,
+        company_id,
+        branch_id,
+        warehouse_id,
         product_id: c.component_product_id,
         move_type: "OUT",
         qty: Number(qty) * Number(c.qty),
         ref_type: "bundle_expand",
         ref_note: note || "Saída via kit",
-        created_by
+        created_by,
       }));
 
       const { error: e4 } = await sb().from("stock_moves").insert(moves);
@@ -765,12 +764,15 @@ async function setClientActive({ company_id, id, is_active }) {
       const created_by = DC_STATE.state.session.userId || null;
 
       const { error } = await sb().from("stock_moves").insert({
-        company_id, branch_id, warehouse_id, product_id,
+        company_id,
+        branch_id,
+        warehouse_id,
+        product_id,
         move_type: "IN",
         qty,
         ref_type: "manual",
         ref_note: note || null,
-        created_by
+        created_by,
       });
       if (error) throw error;
 
@@ -781,7 +783,7 @@ async function setClientActive({ company_id, id, is_active }) {
   })();
 
   /* =========================
-     6) UI (inclui STOCK_UI)
+     6) UI (inclui STOCK_UI + CLIENTS_UI)
   ========================= */
   const DC_UI = (() => {
     const { $, $$ } = DC_HELPERS;
@@ -799,7 +801,7 @@ async function setClientActive({ company_id, id, is_active }) {
       bookings: "Reservas",
       patients: "Pacientes",
       appointments: "Agendamentos",
-      production: "Produção"
+      production: "Produção",
     };
 
     const subtitleMap = {
@@ -814,1035 +816,988 @@ async function setClientActive({ company_id, id, is_active }) {
       bookings: "Salas, estúdios e co-work",
       patients: "Cadastro e histórico",
       appointments: "Consultas e agenda",
-      production: "Produção e custos"
+      production: "Produção e custos",
     };
 
-   /* =========================
-   STOCK_UI (1x listeners)
-========================= */
-const STOCK_UI = (() => {
+    /* =========================
+       STOCK_UI
+    ========================= */
+    const STOCK_UI = (() => {
+      const refreshLowStockBadge = async () => {
+        const el = document.getElementById("badgeLowStock");
+        if (!el) return;
 
-  // ✅ bindOnce único para stock + sales
-  function bindOnce(el, key, eventName, handler) {
-    if (!el) return;
-    const k = `bound_${key}_${eventName}`;
-    if (el.dataset[k] === "1") return;
-    el.dataset[k] = "1";
-    el.addEventListener(eventName, handler);
-  }
-
-  const refreshLowStockBadge = async () => {
-    const el = document.getElementById("badgeLowStock");
-    if (!el) return;
-
-    try {
-      const sb = DC_DB.supabase;
-      const company_id = DC_STATE.state.session.companyId;
-      if (!company_id) return;
-
-      const { count, error } = await sb
-        .from("vw_stock_low")
-        .select("product_id", { count: "exact", head: true })
-        .eq("company_id", company_id);
-
-      if (error) throw error;
-
-      const n = Number(count || 0);
-      el.textContent = n;
-      el.style.display = n > 0 ? "inline-flex" : "none";
-    } catch {
-      el.style.display = "none";
-    }
-  };
-
-  const openLowStockModal = async () => {
-    const old = document.getElementById("dcLowStockModal");
-    if (old) old.remove();
-
-    const overlay = document.createElement("div");
-    overlay.id = "dcLowStockModal";
-    overlay.style.cssText = `
-      position:fixed;inset:0;background:rgba(0,0,0,.55);
-      display:flex;align-items:center;justify-content:center;
-      z-index:999999;padding:18px;
-    `;
-
-    const box = document.createElement("div");
-    box.style.cssText = `
-      width:min(860px, 100%); background:#fff; border-radius:18px;
-      padding:16px 16px 12px; box-shadow:0 20px 60px rgba(0,0,0,.25);
-      border:1px solid rgba(0,0,0,.08); max-height:80vh; overflow:auto;
-    `;
-
-    box.innerHTML = `
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
-        <div style="font-weight:950;font-size:16px">⚠️ Stock baixo</div>
-        <button id="dcCloseLowStock" style="border:none;background:transparent;font-size:18px;font-weight:900;cursor:pointer">✕</button>
-      </div>
-      <p class="muted small" style="margin:8px 0 10px">
-        Itens com quantidade disponível menor ou igual ao mínimo definido.
-      </p>
-      <div id="dcLowStockBody" class="muted small" style="padding:10px 0">A carregar…</div>
-    `;
-
-    overlay.appendChild(box);
-    document.body.appendChild(overlay);
-
-    const close = () => overlay.remove();
-    document.getElementById("dcCloseLowStock")?.addEventListener("click", close);
-    overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
-
-    try {
-      const sb = DC_DB.supabase;
-      const company_id = DC_STATE.state.session.companyId;
-
-      const { data: rows, error } = await sb
-        .from("vw_stock_low")
-        .select("*")
-        .eq("company_id", company_id);
-
-      if (error) throw error;
-
-      const list = rows || [];
-      const body = document.getElementById("dcLowStockBody");
-      if (!body) return;
-
-      if (!list.length) {
-        body.innerHTML = `<div style="padding:10px 0;font-weight:800">✅ Sem alertas no momento.</div>`;
-        return;
-      }
-
-      const whIds = Array.from(new Set(list.map(r => r.warehouse_id).filter(Boolean)));
-      let whMap = {};
-      if (whIds.length) {
-        const { data: whs, error: we } = await sb
-          .from("warehouses")
-          .select("id,name")
-          .in("id", whIds);
-        if (!we && whs) whMap = Object.fromEntries(whs.map(w => [w.id, w.name]));
-      }
-
-      const hasProductName = list.some(r => ("product_name" in r) || ("products" in r));
-      let prodMap = {};
-      if (!hasProductName) {
-        const pIds = Array.from(new Set(list.map(r => r.product_id).filter(Boolean)));
-        if (pIds.length) {
-          const { data: ps, error: pe } = await sb
-            .from("products")
-            .select("id,name,unit")
-            .in("id", pIds);
-          if (!pe && ps) prodMap = Object.fromEntries(ps.map(p => [p.id, { name: p.name, unit: p.unit }]));
-        }
-      }
-
-      const fmt = (n) => Number(n || 0).toLocaleString();
-
-      body.innerHTML = `
-        <div style="overflow:auto">
-          <table style="width:100%;border-collapse:collapse">
-            <thead>
-              <tr>
-                <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(0,0,0,.08)">Produto</th>
-                <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(0,0,0,.08)">Armazém</th>
-                <th style="text-align:right;padding:10px;border-bottom:1px solid rgba(0,0,0,.08)">Disponível</th>
-                <th style="text-align:right;padding:10px;border-bottom:1px solid rgba(0,0,0,.08)">Mínimo</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${list.map(r => {
-                const whName = whMap[r.warehouse_id] || "—";
-                const pName = r.product_name || r.products?.name || prodMap[r.product_id]?.name || "—";
-                const unit  = r.unit || r.products?.unit || prodMap[r.product_id]?.unit || "";
-                return `
-                  <tr>
-                    <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);font-weight:900">
-                      ${pName} <span class="muted small" style="font-weight:800">${unit ? `(${unit})` : ""}</span>
-                    </td>
-                    <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06)">${whName}</td>
-                    <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);text-align:right;font-weight:900">
-                      ${fmt(r.on_hand ?? r.qty_on_hand ?? 0)}
-                    </td>
-                    <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);text-align:right;font-weight:900">
-                      ${fmt(r.min_qty ?? r.min ?? 0)}
-                    </td>
-                  </tr>
-                `;
-              }).join("")}
-            </tbody>
-          </table>
-        </div>
-      `;
-    } catch (err) {
-      const body = document.getElementById("dcLowStockBody");
-      if (body) body.innerHTML = `<div style="padding:10px 0;color:#b91c1c;font-weight:900">❌ ${err?.message || err}</div>`;
-    }
-  };
-
-  const initStockScreen = async () => {
-    if (DC_STATE.state.ui.currentRoute !== "stock") return;
-
-    const sb = DC_DB.supabase;
-    const company_id = DC_STATE.state.session.companyId;
-    if (!company_id) return;
-
-    const { data: branches, error: be } = await sb
-      .from("branches")
-      .select("id")
-      .eq("company_id", company_id)
-      .order("created_at", { ascending: true })
-      .limit(1);
-    if (be) throw be;
-
-    const branch_id = branches?.[0]?.id;
-    if (!branch_id) throw new Error("Crie uma filial (branches) para continuar.");
-
-    const { data: products, error: pe } = await sb
-      .from("products")
-      .select("id,name,product_type")
-      .eq("company_id", company_id)
-      .order("name");
-    if (pe) throw pe;
-
-    let whs = [];
-    {
-      const r1 = await sb
-        .from("warehouses")
-        .select("id,name")
-        .eq("company_id", company_id)
-        .eq("branch_id", branch_id)
-        .order("name");
-      if (r1.error) throw r1.error;
-      whs = r1.data || [];
-
-      if (!whs.length) {
-        const r2 = await sb
-          .from("warehouses")
-          .select("id,name")
-          .eq("company_id", company_id)
-          .order("name");
-        if (r2.error) throw r2.error;
-        whs = r2.data || [];
-      }
-    }
-
-    const prodHtml = (products || []).map(p => `<option value="${p.id}">${p.name} (${p.product_type})</option>`).join("");
-    const whHtml = (whs || []).map(w => `<option value="${w.id}">${w.name}</option>`).join("");
-
-    const fill = (id, html) => { const el = document.getElementById(id); if (el) el.innerHTML = html; };
-    fill("inProduct", prodHtml);
-    fill("outProduct", prodHtml);
-    fill("trProduct", prodHtml);
-    fill("inWarehouse", whHtml);
-    fill("outWarehouse", whHtml);
-    fill("trFromWarehouse", whHtml);
-    fill("trToWarehouse", whHtml);
-
-    // badge click 1x
-    bindOnce(document.getElementById("badgeLowStock"), "badge", "click", (e) => {
-      e.stopPropagation();
-      openLowStockModal();
-    });
-
-    // IN submit 1x
- DC_HELPERS.bindOnce(document.getElementById("stockInForm"), "in", "submit", async (e) => { ... })
-      try {
-        await STOCK_LOGIC.createStockIn({
-          company_id,
-          branch_id,
-          warehouse_id: document.getElementById("inWarehouse").value,
-          product_id: document.getElementById("inProduct").value,
-          qty: Number(document.getElementById("inQty").value),
-          note: document.getElementById("inNote").value
-        });
-        document.getElementById("inMsg").textContent = "✅ Entrada registada.";
-        DC_HELPERS.toast("Entrada registada!", "ok");
-        await refreshLowStockBadge();
-        document.getElementById("btnRefreshBalances")?.click();
-      } catch (err) {
-        document.getElementById("inMsg").textContent = "❌ " + (err?.message || err);
-        DC_HELPERS.toast(err?.message || "Erro", "err");
-      }
-    });
-
-    // OUT submit 1x
-    bindOnce(document.getElementById("stockOutForm"), "out", "submit", async (e) => {
-      e.preventDefault();
-      try {
-        await STOCK_LOGIC.createStockOut({
-          company_id,
-          branch_id,
-          warehouse_id: document.getElementById("outWarehouse").value,
-          product_id: document.getElementById("outProduct").value,
-          qty: Number(document.getElementById("outQty").value),
-          note: document.getElementById("outNote").value
-        });
-        document.getElementById("outMsg").textContent = "✅ Saída registada.";
-        DC_HELPERS.toast("Saída registada!", "ok");
-        await refreshLowStockBadge();
-        document.getElementById("btnRefreshBalances")?.click();
-      } catch (err) {
-        document.getElementById("outMsg").textContent = "❌ " + (err?.message || err);
-        DC_HELPERS.toast(err?.message || "Erro", "err");
-      }
-    });
-
-    // Transfer submit 1x
-    bindOnce(document.getElementById("stockTransferForm"), "tr", "submit", async (e) => {
-      e.preventDefault();
-      try {
-        const fromW = document.getElementById("trFromWarehouse").value;
-        const toW = document.getElementById("trToWarehouse").value;
-        if (fromW === toW) throw new Error("Origem e destino não podem ser o mesmo armazém.");
-
-        await DC_DB.transferStock({
-          company_id,
-          branch_id,
-          from_warehouse_id: fromW,
-          to_warehouse_id: toW,
-          product_id: document.getElementById("trProduct").value,
-          qty: Number(document.getElementById("trQty").value),
-          ref_note: document.getElementById("trNote").value || "Transferência interna"
-        });
-
-        document.getElementById("trMsg").textContent = "✅ Transferência registada.";
-        DC_HELPERS.toast("Transferência registada!", "ok");
-        await refreshLowStockBadge();
-        document.getElementById("btnRefreshBalances")?.click();
-      } catch (err) {
-        document.getElementById("trMsg").textContent = "❌ " + (err?.message || err);
-        DC_HELPERS.toast(err?.message || "Erro", "err");
-      }
-    });
-
-    // balances
-    const balWhSel = document.getElementById("balWarehouse");
-    const balBody = document.getElementById("balBody");
-    const balMsg = document.getElementById("balMsg");
-
-    if (balWhSel) {
-      balWhSel.innerHTML = (whs || []).map(w => `<option value="${w.id}">${w.name}</option>`).join("");
-
-      const renderBalances = async () => {
         try {
-          const warehouse_id = balWhSel.value;
-          if (!warehouse_id) {
-            balBody.innerHTML = `<tr><td style="padding:10px" colspan="3">Nenhum armazém.</td></tr>`;
-            return;
-          }
+          const sb = DC_DB.supabase;
+          const company_id = DC_STATE.state.session.companyId;
+          if (!company_id) return;
 
-          balMsg.textContent = "A carregar saldos…";
-
-          const { data: rows, error } = await sb
-            .from("stock_balances")
-            .select("qty_on_hand, product_id, products(name, unit)")
-            .eq("company_id", company_id)
-            .eq("warehouse_id", warehouse_id)
-            .order("updated_at", { ascending: false });
-
+          const { count, error } = await sb.from("vw_stock_low").select("product_id", { count: "exact", head: true }).eq("company_id", company_id);
           if (error) throw error;
 
-          const list = rows || [];
-          if (!list.length) {
-            balBody.innerHTML = `<tr><td class="muted small" style="padding:10px" colspan="3">Sem registos de saldo ainda.</td></tr>`;
-            balMsg.textContent = "";
-            return;
-          }
-
-          balBody.innerHTML = list.map(r => `
-            <tr>
-              <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06)">${r.products?.name || "—"}</td>
-              <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06)">${r.products?.unit || "un"}</td>
-              <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);text-align:right;font-weight:900">
-                ${Number(r.qty_on_hand || 0).toLocaleString()}
-              </td>
-            </tr>
-          `).join("");
-
-          balMsg.textContent = "";
-        } catch (err) {
-          balMsg.textContent = "❌ " + (err?.message || err);
+          const n = Number(count || 0);
+          el.textContent = n;
+          el.style.display = n > 0 ? "inline-flex" : "none";
+        } catch {
+          el.style.display = "none";
         }
       };
 
-      bindOnce(balWhSel, "balWh", "change", () => renderBalances());
-      bindOnce(document.getElementById("btnRefreshBalances"), "balBtn", "click", () => renderBalances());
+      const openLowStockModal = async () => {
+        const old = document.getElementById("dcLowStockModal");
+        if (old) old.remove();
 
-      await renderBalances();
-    }
+        const overlay = document.createElement("div");
+        overlay.id = "dcLowStockModal";
+        overlay.style.cssText = `
+          position:fixed;inset:0;background:rgba(0,0,0,.55);
+          display:flex;align-items:center;justify-content:center;
+          z-index:999999;padding:18px;
+        `;
 
-    await refreshLowStockBadge();
-  };
+        const box = document.createElement("div");
+        box.style.cssText = `
+          width:min(860px, 100%); background:#fff; border-radius:18px;
+          padding:16px 16px 12px; box-shadow:0 20px 60px rgba(0,0,0,.25);
+          border:1px solid rgba(0,0,0,.08); max-height:80vh; overflow:auto;
+        `;
 
-  const initSalesScreen = async () => {
-    const route = DC_STATE.state.ui.currentRoute;
-    if (route !== "sales") return;
-
-    const sb = DC_DB.supabase;
-    const company_id = DC_STATE.state.session.companyId;
-    if (!company_id) return;
-
-    const { data: branches, error: be } = await sb
-      .from("branches")
-      .select("id")
-      .eq("company_id", company_id)
-      .order("created_at", { ascending: true })
-      .limit(1);
-    if (be) throw be;
-
-    const branch_id = branches?.[0]?.id;
-    if (!branch_id) throw new Error("Crie uma filial (branches) para continuar.");
-
-    let whs = [];
-    {
-      const r1 = await sb
-        .from("warehouses")
-        .select("id,name")
-        .eq("company_id", company_id)
-        .eq("branch_id", branch_id)
-        .order("name");
-      if (r1.error) throw r1.error;
-      whs = r1.data || [];
-
-      if (!whs.length) {
-        const r2 = await sb
-          .from("warehouses")
-          .select("id,name")
-          .eq("company_id", company_id)
-          .order("name");
-        if (r2.error) throw r2.error;
-        whs = r2.data || [];
-      }
-    }
-
-    const whSel = document.getElementById("posWarehouse");
-    const whHint = document.getElementById("posWarehouseHint");
-    if (!whSel) return;
-
-    if (!whs.length) {
-      whSel.innerHTML = "";
-      if (whHint) whHint.textContent = "❌ Crie um armazém para vender.";
-      return;
-    }
-
-    whSel.innerHTML = whs.map(w => `<option value="${w.id}">${w.name}</option>`).join("");
-    if (whHint) whHint.textContent = "Vender a partir do armazém selecionado.";
-
-    // ===== CLIENTES (safe) =====
-    const clientSel  = document.getElementById("posClient");
-    const clientQ    = document.getElementById("posClientSearch");
-    const clientHint = document.getElementById("posClientHint");
-
-    let clients = [];
-
-    const loadClientsSafe = async () => {
-      let r = await sb
-        .from("clients")
-        .select("id, name, phone")
-        .eq("company_id", company_id)
-        .order("name");
-
-      if (r.error) {
-        r = await sb
-          .from("clients")
-          .select("id, name")
-          .eq("company_id", company_id)
-          .order("name");
-      }
-
-      if (r.error) throw r.error;
-      return r.data || [];
-    };
-
-    const renderClients = (filterText = "") => {
-      if (!clientSel) return;
-
-      const q = String(filterText || "").trim().toLowerCase();
-
-      const list = (clients || []).filter(c => {
-        const name = String(c.name || "").toLowerCase();
-        const phone = String(c.phone || "").toLowerCase();
-        return !q || name.includes(q) || phone.includes(q);
-      });
-
-      clientSel.innerHTML =
-        `<option value="">— Selecionar cliente —</option>` +
-        list.map(c => {
-          const label = `${c.name}${c.phone ? ` • ${c.phone}` : ""}`;
-          return `<option value="${c.id}">${label}</option>`;
-        }).join("");
-
-      if (clientHint) {
-        clientHint.textContent = list.length
-          ? "Pagamento parcial cria dívida ligada ao cliente."
-          : "⚠️ Sem clientes. Crie em Clientes.";
-      }
-    };
-
-    try {
-      clients = await loadClientsSafe();
-      renderClients("");
-    } catch (e) {
-      clients = [];
-      if (clientHint) clientHint.textContent = "❌ Erro ao carregar clientes: " + (e?.message || e);
-      if (clientSel) clientSel.innerHTML = `<option value="">— Erro —</option>`;
-    }
-
-    bindOnce(clientQ, "clientQ", "input", (e) => renderClients(e.target.value));
-
-    // contas
-    const accSel = document.getElementById("posAccount");
-    if (accSel) {
-      try {
-        const accs = await DC_DB.listCashAccounts(company_id);
-        accSel.innerHTML =
-          `<option value="">— Não movimentar —</option>` +
-          accs.map(a => `<option value="${a.id}">${a.name} (${a.type})</option>`).join("");
-      } catch {
-        accSel.innerHTML = `<option value="">— Não movimentar —</option>`;
-      }
-    }
-
-    // produtos
-    const { data: products, error: pe } = await sb
-      .from("products")
-      .select("id, name, unit, product_type, price, min_qty, is_active")
-      .eq("company_id", company_id)
-      .order("name");
-    if (pe) throw pe;
-
-    const activeProducts = (products || []).filter(p => p.is_active !== false);
-
-    const cart = new Map();
-
-    const $prodWrap = document.getElementById("posProducts");
-    const $prodMsg  = document.getElementById("posProdMsg");
-    const $cartBody = document.getElementById("posCartBody");
-    const $sum      = document.getElementById("posSummary");
-    const $msg      = document.getElementById("posMsg");
-
-    const fmt = (n) => Number(n || 0).toLocaleString();
-    const money = (n) => Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-    const getOnHandMap = async (warehouse_id) => {
-      const { data: rows, error } = await sb
-        .from("vw_stock_levels")
-        .select("product_id, on_hand, min_qty")
-        .eq("company_id", company_id)
-        .eq("warehouse_id", warehouse_id);
-      if (error) throw error;
-
-      const map = {};
-      (rows || []).forEach(r => { map[r.product_id] = r; });
-      return map;
-    };
-
-    let onHandMap = await getOnHandMap(whSel.value);
-
-    const renderProducts = (filterText = "") => {
-      const q = String(filterText || "").trim().toLowerCase();
-      const list = (activeProducts || []).filter(p => !q || p.name.toLowerCase().includes(q));
-
-      if (!$prodWrap) return;
-      if (!list.length) {
-        $prodWrap.innerHTML = `<div class="muted small">Sem produtos.</div>`;
-        return;
-      }
-
-      $prodWrap.innerHTML = list.map(p => {
-        const lvl = onHandMap[p.id];
-        const on_hand = lvl?.on_hand ?? 0;
-        const min_qty = lvl?.min_qty ?? p.min_qty ?? 0;
-
-        const low = Number(on_hand) <= Number(min_qty);
-        const badge = low ? "⚠️" : "✅";
-
-        return `
-          <div class="card" style="padding:12px;display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap">
-            <div style="min-width:260px">
-              <div style="font-weight:950">${p.name} <span class="muted small">(${p.product_type})</span></div>
-              <div class="muted small">${badge} Stock: <b>${fmt(on_hand)}</b> ${p.unit || ""} | Mín: <b>${fmt(min_qty)}</b></div>
-            </div>
-            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-              <div style="font-weight:950">Preço: ${money(p.price || 0)}</div>
-              <button data-add="${p.id}" type="button"
-                style="padding:10px 12px;border-radius:12px;border:1px solid rgba(0,0,0,.12);font-weight:900;cursor:pointer">
-                + Adicionar
-              </button>
-            </div>
+        box.innerHTML = `
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+            <div style="font-weight:950;font-size:16px">⚠️ Stock baixo</div>
+            <button id="dcCloseLowStock" style="border:none;background:transparent;font-size:18px;font-weight:900;cursor:pointer">✕</button>
           </div>
+          <p class="muted small" style="margin:8px 0 10px">
+            Itens com quantidade disponível menor ou igual ao mínimo definido.
+          </p>
+          <div id="dcLowStockBody" class="muted small" style="padding:10px 0">A carregar…</div>
         `;
-      }).join("");
 
-      $prodWrap.querySelectorAll("[data-add]").forEach(btn => {
-        btn.addEventListener("click", () => {
-          const pid = btn.getAttribute("data-add");
-          const p = activeProducts.find(x => x.id === pid);
-          if (!p) return;
+        overlay.appendChild(box);
+        document.body.appendChild(overlay);
 
-          const cur = cart.get(pid);
-          const newQty = (cur?.qty || 0) + 1;
-          cart.set(pid, { product: p, qty: newQty, price: Number(p.price || 0) });
-          renderCart();
+        const close = () => overlay.remove();
+        document.getElementById("dcCloseLowStock")?.addEventListener("click", close);
+        overlay.addEventListener("click", (e) => {
+          if (e.target === overlay) close();
         });
-      });
-    };
 
-    const renderCart = () => {
-      const items = Array.from(cart.values());
-      if (!$cartBody || !$sum) return;
+        try {
+          const sb = DC_DB.supabase;
+          const company_id = DC_STATE.state.session.companyId;
 
-      if (!items.length) {
-        $cartBody.innerHTML = `<tr><td class="muted small" style="padding:10px" colspan="5">Carrinho vazio.</td></tr>`;
-        $sum.textContent = "—";
-        return;
-      }
+          const { data: rows, error } = await sb.from("vw_stock_low").select("*").eq("company_id", company_id);
+          if (error) throw error;
 
-      const total = items.reduce((a, it) => a + (it.qty * it.price), 0);
+          const list = rows || [];
+          const body = document.getElementById("dcLowStockBody");
+          if (!body) return;
 
-      $cartBody.innerHTML = items.map(it => {
-        const p = it.product;
-        const line = it.qty * it.price;
-        return `
-          <tr>
-            <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);font-weight:900">${p.name}</td>
-            <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);text-align:right">${money(it.price)}</td>
-            <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);text-align:right">
-              <input data-qty="${p.id}" type="number" step="0.001" min="0" value="${it.qty}"
-                style="width:110px;padding:8px;border-radius:10px;border:1px solid rgba(0,0,0,.12);text-align:right"/>
-            </td>
-            <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);text-align:right;font-weight:900">${money(line)}</td>
-            <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);text-align:right">
-              <button data-rm="${p.id}" type="button"
-                style="padding:8px 10px;border-radius:10px;border:1px solid rgba(0,0,0,.12);font-weight:900;cursor:pointer">
-                Remover
-              </button>
-            </td>
-          </tr>
-        `;
-      }).join("");
-
-      $sum.textContent = `Itens: ${items.length} | Total: ${money(total)}`;
-
-      $cartBody.querySelectorAll("[data-qty]").forEach(inp => {
-        inp.addEventListener("change", () => {
-          const pid = inp.getAttribute("data-qty");
-          const v = Number(inp.value || 0);
-          if (!pid) return;
-
-          if (v <= 0) cart.delete(pid);
-          else {
-            const cur = cart.get(pid);
-            if (cur) cart.set(pid, { ...cur, qty: v });
+          if (!list.length) {
+            body.innerHTML = `<div style="padding:10px 0;font-weight:800">✅ Sem alertas no momento.</div>`;
+            return;
           }
-          renderCart();
+
+          const whIds = Array.from(new Set(list.map((r) => r.warehouse_id).filter(Boolean)));
+          let whMap = {};
+          if (whIds.length) {
+            const { data: whs, error: we } = await sb.from("warehouses").select("id,name").in("id", whIds);
+            if (!we && whs) whMap = Object.fromEntries(whs.map((w) => [w.id, w.name]));
+          }
+
+          const hasProductName = list.some((r) => "product_name" in r || "products" in r);
+          let prodMap = {};
+          if (!hasProductName) {
+            const pIds = Array.from(new Set(list.map((r) => r.product_id).filter(Boolean)));
+            if (pIds.length) {
+              const { data: ps, error: pe } = await sb.from("products").select("id,name,unit").in("id", pIds);
+              if (!pe && ps) prodMap = Object.fromEntries(ps.map((p) => [p.id, { name: p.name, unit: p.unit }]));
+            }
+          }
+
+          const fmt = (n) => Number(n || 0).toLocaleString();
+
+          body.innerHTML = `
+            <div style="overflow:auto">
+              <table style="width:100%;border-collapse:collapse">
+                <thead>
+                  <tr>
+                    <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(0,0,0,.08)">Produto</th>
+                    <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(0,0,0,.08)">Armazém</th>
+                    <th style="text-align:right;padding:10px;border-bottom:1px solid rgba(0,0,0,.08)">Disponível</th>
+                    <th style="text-align:right;padding:10px;border-bottom:1px solid rgba(0,0,0,.08)">Mínimo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${list
+                    .map((r) => {
+                      const whName = whMap[r.warehouse_id] || "—";
+                      const pName = r.product_name || r.products?.name || prodMap[r.product_id]?.name || "—";
+                      const unit = r.unit || r.products?.unit || prodMap[r.product_id]?.unit || "";
+                      return `
+                        <tr>
+                          <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);font-weight:900">
+                            ${pName} <span class="muted small" style="font-weight:800">${unit ? `(${unit})` : ""}</span>
+                          </td>
+                          <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06)">${whName}</td>
+                          <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);text-align:right;font-weight:900">
+                            ${fmt(r.on_hand ?? r.qty_on_hand ?? 0)}
+                          </td>
+                          <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);text-align:right;font-weight:900">
+                            ${fmt(r.min_qty ?? r.min ?? 0)}
+                          </td>
+                        </tr>
+                      `;
+                    })
+                    .join("")}
+                </tbody>
+              </table>
+            </div>
+          `;
+        } catch (err) {
+          const body = document.getElementById("dcLowStockBody");
+          if (body) body.innerHTML = `<div style="padding:10px 0;color:#b91c1c;font-weight:900">❌ ${err?.message || err}</div>`;
+        }
+      };
+
+      const initStockScreen = async () => {
+        if (DC_STATE.state.ui.currentRoute !== "stock") return;
+
+        const sb = DC_DB.supabase;
+        const company_id = DC_STATE.state.session.companyId;
+        if (!company_id) return;
+
+        const { data: branches, error: be } = await sb.from("branches").select("id").eq("company_id", company_id).order("created_at", { ascending: true }).limit(1);
+        if (be) throw be;
+
+        const branch_id = branches?.[0]?.id;
+        if (!branch_id) throw new Error("Crie uma filial (branches) para continuar.");
+
+        const { data: products, error: pe } = await sb.from("products").select("id,name,product_type").eq("company_id", company_id).order("name");
+        if (pe) throw pe;
+
+        let whs = [];
+        {
+          const r1 = await sb.from("warehouses").select("id,name").eq("company_id", company_id).eq("branch_id", branch_id).order("name");
+          if (r1.error) throw r1.error;
+          whs = r1.data || [];
+
+          if (!whs.length) {
+            const r2 = await sb.from("warehouses").select("id,name").eq("company_id", company_id).order("name");
+            if (r2.error) throw r2.error;
+            whs = r2.data || [];
+          }
+        }
+
+        const prodHtml = (products || []).map((p) => `<option value="${p.id}">${p.name} (${p.product_type})</option>`).join("");
+        const whHtml = (whs || []).map((w) => `<option value="${w.id}">${w.name}</option>`).join("");
+
+        const fill = (id, html) => {
+          const el = document.getElementById(id);
+          if (el) el.innerHTML = html;
+        };
+        fill("inProduct", prodHtml);
+        fill("outProduct", prodHtml);
+        fill("trProduct", prodHtml);
+        fill("inWarehouse", whHtml);
+        fill("outWarehouse", whHtml);
+        fill("trFromWarehouse", whHtml);
+        fill("trToWarehouse", whHtml);
+
+        // badge click 1x
+        DC_HELPERS.bindOnce(document.getElementById("badgeLowStock"), "badge", "click", (e) => {
+          e.stopPropagation();
+          openLowStockModal();
         });
-      });
 
-      $cartBody.querySelectorAll("[data-rm]").forEach(btn => {
-        btn.addEventListener("click", () => {
-          cart.delete(btn.getAttribute("data-rm"));
-          renderCart();
-        });
-      });
-    };
-
-    bindOnce(document.getElementById("posSearch"), "posSearch", "input", (e) => renderProducts(e.target.value));
-
-    bindOnce(whSel, "posWarehouse", "change", async () => {
-      try {
-        if ($prodMsg) $prodMsg.textContent = "A atualizar stock…";
-        onHandMap = await getOnHandMap(whSel.value);
-        renderProducts(document.getElementById("posSearch")?.value || "");
-        if ($prodMsg) $prodMsg.textContent = "";
-      } catch (err) {
-        if ($prodMsg) $prodMsg.textContent = "❌ " + (err?.message || err);
-      }
-    });
-
-    bindOnce(document.getElementById("posClear"), "posClear", "click", () => {
-      cart.clear();
-      if ($msg) $msg.textContent = "";
-      renderCart();
-    });
-
-    // ✅ FINALIZAR VENDA (bindOnce único)
-    bindOnce(document.getElementById("posCheckout"), "posCheckout", "click", async () => {
-      try {
-        if ($msg) $msg.textContent = "A finalizar…";
-
-        const items = Array.from(cart.values()).map(it => ({
-          product_id: it.product.id,
-          qty: Number(it.qty),
-          price: Number(it.price)
-        }));
-        if (!items.length) throw new Error("Carrinho vazio.");
-
-        const warehouse_id = whSel.value;
-        const ref_note = document.getElementById("posNote")?.value || "Venda POS";
-
-        const total = items.reduce((a, it) => a + (it.qty * it.price), 0);
-
-        const received = Number(document.getElementById("posPaid")?.value || 0);
-        const paid   = Math.min(received, total);
-        const change = Math.max(received - total, 0);
-        const due    = Math.max(total - received, 0);
-
-        const client_id = document.getElementById("posClient")?.value || null;
-
-        const sale_id = await DC_DB.createSale({
-          company_id,
-          branch_id,
-          warehouse_id,
-          items,
-          ref_note
-        });
-
-        const status = due > 0 ? (paid > 0 ? "PARTIAL" : "DUE") : "PAID";
-
-        await DC_DB.supabase
-          .from("sales")
-          .update({ status, total, ref_note, client_id })
-          .eq("id", sale_id);
-
-        const account_id = document.getElementById("posAccount")?.value || null;
-        const method = document.getElementById("posPayMethod")?.value || "cash";
-
-        if (paid > 0) {
+        // ✅ IN submit 1x (corrigido: removi o "..." que quebrava tudo)
+        DC_HELPERS.bindOnce(document.getElementById("stockInForm"), "stockInForm", "submit", async (e) => {
+          e.preventDefault();
           try {
-            await DC_DB.supabase.from("sale_payments").insert({
-              company_id,
-              sale_id,
-              account_id,
-              method,
-              amount: paid,
-              created_by: DC_STATE.state.session.userId || null
-            });
-          } catch (e) {
-            console.warn("sale_payments não gravou:", e?.message || e);
-          }
-
-          if (account_id) {
-            await DC_DB.createCashMove({
+            await STOCK_LOGIC.createStockIn({
               company_id,
               branch_id,
-              account_id,
-              move_type: "IN",
-              amount: paid,
-              ref_type: "sale",
-              ref_id: sale_id,
-              note: `Recebimento venda | ${ref_note}`
+              warehouse_id: document.getElementById("inWarehouse")?.value,
+              product_id: document.getElementById("inProduct")?.value,
+              qty: Number(document.getElementById("inQty")?.value || 0),
+              note: document.getElementById("inNote")?.value,
             });
-          }
-        }
-
-        if (due > 0) {
-          if (!client_id) throw new Error("Pagamento parcial exige selecionar cliente.");
-          try {
-            await DC_DB.supabase.from("client_ledger").insert({
-              company_id,
-              client_id,
-              entry_type: "DEBIT",
-              amount: due,
-              ref_type: "sale",
-              ref_id: sale_id,
-              note: `Dívida da venda | ${ref_note}`,
-              created_by: DC_STATE.state.session.userId || null
-            });
-          } catch (e) {
-            console.warn("client_ledger não gravou:", e?.message || e);
-          }
-        }
-
-        cart.clear();
-        renderCart();
-
-        onHandMap = await getOnHandMap(warehouse_id);
-        renderProducts(document.getElementById("posSearch")?.value || "");
-
-        await refreshLowStockBadge();
-
-        if ($msg) {
-          $msg.textContent =
-            `✅ Venda: ${sale_id} | Total: ${money(total)} | Pago: ${money(paid)}`
-            + (due > 0 ? ` | Dívida: ${money(due)}` : "")
-            + (change > 0 ? ` | Troco: ${money(change)}` : "");
-        }
-
-        DC_HELPERS.toast("Venda finalizada!", "ok");
-      } catch (err) {
-        if ($msg) $msg.textContent = "❌ " + (err?.message || err);
-        DC_HELPERS.toast(err?.message || "Erro", "err");
-      }
-    });
-
-    // primeiro render
-    renderProducts("");
-    renderCart();
-    await refreshLowStockBadge();
-  };
-/* =========================
-   CLIENTS_UI
-========================= */
-const CLIENTS_UI = (() => {
-  function bindOnce(el, key, eventName, handler) {
-    if (!el) return;
-    const k = `bound_${key}_${eventName}`;
-    if (el.dataset[k] === "1") return;
-    el.dataset[k] = "1";
-    el.addEventListener(eventName, handler);
-  }
-
-  const openClientModal = ({ mode, client }) => {
-    const old = document.getElementById("dcClientModal");
-    if (old) old.remove();
-
-    const overlay = document.createElement("div");
-    overlay.id = "dcClientModal";
-    overlay.style.cssText = `
-      position:fixed;inset:0;background:rgba(0,0,0,.55);
-      display:flex;align-items:center;justify-content:center;
-      z-index:999999;padding:18px;
-    `;
-
-    const box = document.createElement("div");
-    box.style.cssText = `
-      width:min(560px, 100%); background:#fff; border-radius:18px;
-      padding:16px 16px 12px; box-shadow:0 20px 60px rgba(0,0,0,.25);
-      border:1px solid rgba(0,0,0,.08);
-    `;
-
-    const title = mode === "edit" ? "Editar Cliente" : "Novo Cliente";
-
-    box.innerHTML = `
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
-        <div style="font-weight:950;font-size:16px">👤 ${title}</div>
-        <button id="dcCloseClient" style="border:none;background:transparent;font-size:18px;font-weight:900;cursor:pointer">✕</button>
-      </div>
-
-      <div class="divider" style="margin:12px 0"></div>
-
-      <form id="cliForm" style="display:grid;gap:10px">
-        <input id="cliName" placeholder="Nome *" value="${client?.name || ""}"
-          style="width:100%;padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12)"/>
-        <input id="cliPhone" placeholder="Telefone" value="${client?.phone || ""}"
-          style="width:100%;padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12)"/>
-        <input id="cliEmail" placeholder="Email" value="${client?.email || ""}"
-          style="width:100%;padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12)"/>
-        <input id="cliAddress" placeholder="Endereço" value="${client?.address || ""}"
-          style="width:100%;padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12)"/>
-
-        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px">
-          <button type="submit" id="cliSave"
-            style="flex:1;min-width:180px;padding:12px 14px;border-radius:14px;
-              border:1px solid rgba(0,0,0,.12); background:#0ea5e9;color:#fff;font-weight:900;cursor:pointer">
-            Guardar
-          </button>
-
-          <button type="button" id="cliCancel"
-            style="flex:1;min-width:180px;padding:12px 14px;border-radius:14px;
-              border:1px solid rgba(0,0,0,.12); background:#fff;font-weight:900;cursor:pointer">
-            Cancelar
-          </button>
-        </div>
-
-        <p id="cliFormMsg" class="muted small" style="margin:6px 0 0"></p>
-      </form>
-    `;
-
-    overlay.appendChild(box);
-    document.body.appendChild(overlay);
-
-    const close = () => overlay.remove();
-    document.getElementById("dcCloseClient")?.addEventListener("click", close);
-    document.getElementById("cliCancel")?.addEventListener("click", close);
-    overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
-
-    return { overlay, close };
-  };
-
-  const initClientsScreen = async () => {
-    if (DC_STATE.state.ui.currentRoute !== "clients") return;
-
-    const company_id = DC_STATE.state.session.companyId;
-    if (!company_id) return;
-
-    const body = document.getElementById("cliBody");
-    const msg  = document.getElementById("cliMsg");
-    const qInp = document.getElementById("cliSearch");
-    const showInactive = document.getElementById("cliShowInactive");
-
-    let cache = [];
-
-    const matches = (c, q) => {
-      q = String(q || "").trim().toLowerCase();
-      if (!q) return true;
-      return (
-        String(c.name || "").toLowerCase().includes(q) ||
-        String(c.phone || "").toLowerCase().includes(q) ||
-        String(c.email || "").toLowerCase().includes(q)
-      );
-    };
-
-    const render = () => {
-      const q = qInp?.value || "";
-      const list = (cache || []).filter(c => matches(c, q));
-
-      if (!body) return;
-      if (!list.length) {
-        body.innerHTML = `<tr><td class="muted small" style="padding:10px" colspan="5">Sem clientes.</td></tr>`;
-        return;
-      }
-
-      body.innerHTML = list.map(c => `
-        <tr>
-          <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);font-weight:900">${c.name || "—"}</td>
-          <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06)">${c.phone || "—"}</td>
-          <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06)">${c.email || "—"}</td>
-          <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);font-weight:900">
-            ${c.is_active ? "✅ Ativo" : "⛔ Inativo"}
-          </td>
-          <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);text-align:right">
-            <button data-edit="${c.id}" type="button"
-              style="padding:8px 10px;border-radius:10px;border:1px solid rgba(0,0,0,.12);font-weight:900;cursor:pointer">
-              Editar
-            </button>
-            <button data-toggle="${c.id}" type="button"
-              style="margin-left:8px;padding:8px 10px;border-radius:10px;border:1px solid rgba(0,0,0,.12);font-weight:900;cursor:pointer">
-              ${c.is_active ? "Desativar" : "Ativar"}
-            </button>
-          </td>
-        </tr>
-      `).join("");
-
-      // binds por render (ok)
-      body.querySelectorAll("[data-edit]").forEach(btn => {
-        btn.addEventListener("click", () => {
-          const id = btn.getAttribute("data-edit");
-          const client = cache.find(x => x.id === id);
-          if (!client) return;
-
-          const { close } = openClientModal({ mode: "edit", client });
-
-          document.getElementById("cliForm")?.addEventListener("submit", async (e) => {
-            e.preventDefault();
-            const fm = document.getElementById("cliFormMsg");
-
-            try {
-              const name = (document.getElementById("cliName")?.value || "").trim();
-              if (!name) throw new Error("Nome é obrigatório.");
-
-              fm.textContent = "A guardar…";
-
-         await DC_DB.updateClient({
-  company_id,
-  id: client.id,
-  name,
-  phone: (document.getElementById("cliPhone")?.value || "").trim(),
-  email: (document.getElementById("cliEmail")?.value || "").trim(),
-  address: (document.getElementById("cliAddress")?.value || "").trim()
-});
-
-
-              close();
-              await load();
-              DC_HELPERS.toast("Cliente atualizado!", "ok");
-            } catch (err) {
-              fm.textContent = "❌ " + (err?.message || err);
-              DC_HELPERS.toast(err?.message || "Erro", "err");
-            }
-          }, { once: true });
-        });
-      });
-
-      body.querySelectorAll("[data-toggle]").forEach(btn => {
-        btn.addEventListener("click", async () => {
-          const id = btn.getAttribute("data-toggle");
-          const client = cache.find(x => x.id === id);
-          if (!client) return;
-
-          try {
-            await DC_DB.setClientActive({ company_id, id, is_active: !client.is_active });
-            await load();
-            DC_HELPERS.toast(client.is_active ? "Cliente desativado." : "Cliente ativado.", "info");
+            const m = document.getElementById("inMsg");
+            if (m) m.textContent = "✅ Entrada registada.";
+            DC_HELPERS.toast("Entrada registada!", "ok");
+            await refreshLowStockBadge();
+            document.getElementById("btnRefreshBalances")?.click();
           } catch (err) {
+            const m = document.getElementById("inMsg");
+            if (m) m.textContent = "❌ " + (err?.message || err);
             DC_HELPERS.toast(err?.message || "Erro", "err");
           }
         });
-      });
-    };
 
-    const load = async () => {
-      try {
-        if (msg) msg.textContent = "A carregar…";
-        const include_inactive = !!showInactive?.checked;
+        // OUT submit 1x
+        DC_HELPERS.bindOnce(document.getElementById("stockOutForm"), "stockOutForm", "submit", async (e) => {
+          e.preventDefault();
+          try {
+            await STOCK_LOGIC.createStockOut({
+              company_id,
+              branch_id,
+              warehouse_id: document.getElementById("outWarehouse")?.value,
+              product_id: document.getElementById("outProduct")?.value,
+              qty: Number(document.getElementById("outQty")?.value || 0),
+              note: document.getElementById("outNote")?.value,
+            });
+            const m = document.getElementById("outMsg");
+            if (m) m.textContent = "✅ Saída registada.";
+            DC_HELPERS.toast("Saída registada!", "ok");
+            await refreshLowStockBadge();
+            document.getElementById("btnRefreshBalances")?.click();
+          } catch (err) {
+            const m = document.getElementById("outMsg");
+            if (m) m.textContent = "❌ " + (err?.message || err);
+            DC_HELPERS.toast(err?.message || "Erro", "err");
+          }
+        });
 
-        // se include_inactive=true, traz tudo; senão só ativos
-        cache = await DC_DB.listClients(company_id, { include_inactive });
+        // Transfer submit 1x
+        DC_HELPERS.bindOnce(document.getElementById("stockTransferForm"), "stockTransferForm", "submit", async (e) => {
+          e.preventDefault();
+          try {
+            const fromW = document.getElementById("trFromWarehouse")?.value;
+            const toW = document.getElementById("trToWarehouse")?.value;
+            if (fromW === toW) throw new Error("Origem e destino não podem ser o mesmo armazém.");
 
-        if (msg) msg.textContent = "";
-        render();
-      } catch (err) {
-        if (msg) msg.textContent = "❌ " + (err?.message || err);
-        if (body) body.innerHTML = `<tr><td style="padding:10px" colspan="5">Erro ao carregar.</td></tr>`;
-      }
-    };
+            await DC_DB.transferStock({
+              company_id,
+              branch_id,
+              from_warehouse_id: fromW,
+              to_warehouse_id: toW,
+              product_id: document.getElementById("trProduct")?.value,
+              qty: Number(document.getElementById("trQty")?.value || 0),
+              ref_note: document.getElementById("trNote")?.value || "Transferência interna",
+            });
 
-    // binds 1x
-    bindOnce(document.getElementById("cliRefresh"), "cliRefresh", "click", () => load());
-    bindOnce(qInp, "cliSearch", "input", () => render());
-    bindOnce(showInactive, "cliShowInactive", "change", () => load());
+            const m = document.getElementById("trMsg");
+            if (m) m.textContent = "✅ Transferência registada.";
+            DC_HELPERS.toast("Transferência registada!", "ok");
+            await refreshLowStockBadge();
+            document.getElementById("btnRefreshBalances")?.click();
+          } catch (err) {
+            const m = document.getElementById("trMsg");
+            if (m) m.textContent = "❌ " + (err?.message || err);
+            DC_HELPERS.toast(err?.message || "Erro", "err");
+          }
+        });
 
-    bindOnce(document.getElementById("cliNew"), "cliNew", "click", () => {
-      const { close } = openClientModal({ mode: "new", client: null });
+        // balances
+        const balWhSel = document.getElementById("balWarehouse");
+        const balBody = document.getElementById("balBody");
+        const balMsg = document.getElementById("balMsg");
 
-      document.getElementById("cliForm")?.addEventListener("submit", async (e) => {
-        e.preventDefault();
-        const fm = document.getElementById("cliFormMsg");
+        if (balWhSel) {
+          balWhSel.innerHTML = (whs || []).map((w) => `<option value="${w.id}">${w.name}</option>`).join("");
+
+          const renderBalances = async () => {
+            try {
+              const warehouse_id = balWhSel.value;
+              if (!warehouse_id) {
+                if (balBody) balBody.innerHTML = `<tr><td style="padding:10px" colspan="3">Nenhum armazém.</td></tr>`;
+                return;
+              }
+
+              if (balMsg) balMsg.textContent = "A carregar saldos…";
+
+              const { data: rows, error } = await sb
+                .from("stock_balances")
+                .select("qty_on_hand, product_id, products(name, unit)")
+                .eq("company_id", company_id)
+                .eq("warehouse_id", warehouse_id)
+                .order("updated_at", { ascending: false });
+
+              if (error) throw error;
+
+              const list = rows || [];
+              if (!list.length) {
+                if (balBody) balBody.innerHTML = `<tr><td class="muted small" style="padding:10px" colspan="3">Sem registos de saldo ainda.</td></tr>`;
+                if (balMsg) balMsg.textContent = "";
+                return;
+              }
+
+              if (balBody) {
+                balBody.innerHTML = list
+                  .map(
+                    (r) => `
+                    <tr>
+                      <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06)">${r.products?.name || "—"}</td>
+                      <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06)">${r.products?.unit || "un"}</td>
+                      <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);text-align:right;font-weight:900">
+                        ${Number(r.qty_on_hand || 0).toLocaleString()}
+                      </td>
+                    </tr>
+                  `
+                  )
+                  .join("");
+              }
+
+              if (balMsg) balMsg.textContent = "";
+            } catch (err) {
+              if (balMsg) balMsg.textContent = "❌ " + (err?.message || err);
+            }
+          };
+
+          DC_HELPERS.bindOnce(balWhSel, "balWh", "change", () => renderBalances());
+          DC_HELPERS.bindOnce(document.getElementById("btnRefreshBalances"), "balBtn", "click", () => renderBalances());
+
+          await renderBalances();
+        }
+
+        await refreshLowStockBadge();
+      };
+
+      // ============= SALES SCREEN (mantive teu código como estava) =============
+      const initSalesScreen = async () => {
+        const route = DC_STATE.state.ui.currentRoute;
+        if (route !== "sales") return;
+
+        const sb = DC_DB.supabase;
+        const company_id = DC_STATE.state.session.companyId;
+        if (!company_id) return;
+
+        const { data: branches, error: be } = await sb.from("branches").select("id").eq("company_id", company_id).order("created_at", { ascending: true }).limit(1);
+        if (be) throw be;
+
+        const branch_id = branches?.[0]?.id;
+        if (!branch_id) throw new Error("Crie uma filial (branches) para continuar.");
+
+        let whs = [];
+        {
+          const r1 = await sb.from("warehouses").select("id,name").eq("company_id", company_id).eq("branch_id", branch_id).order("name");
+          if (r1.error) throw r1.error;
+          whs = r1.data || [];
+
+          if (!whs.length) {
+            const r2 = await sb.from("warehouses").select("id,name").eq("company_id", company_id).order("name");
+            if (r2.error) throw r2.error;
+            whs = r2.data || [];
+          }
+        }
+
+        const whSel = document.getElementById("posWarehouse");
+        const whHint = document.getElementById("posWarehouseHint");
+        if (!whSel) return;
+
+        if (!whs.length) {
+          whSel.innerHTML = "";
+          if (whHint) whHint.textContent = "❌ Crie um armazém para vender.";
+          return;
+        }
+
+        whSel.innerHTML = whs.map((w) => `<option value="${w.id}">${w.name}</option>`).join("");
+        if (whHint) whHint.textContent = "Vender a partir do armazém selecionado.";
+
+        // ===== CLIENTES (safe) =====
+        const clientSel = document.getElementById("posClient");
+        const clientQ = document.getElementById("posClientSearch");
+        const clientHint = document.getElementById("posClientHint");
+
+        let clients = [];
+
+        const loadClientsSafe = async () => {
+          let r = await sb.from("clients").select("id, name, phone").eq("company_id", company_id).order("name");
+          if (r.error) {
+            r = await sb.from("clients").select("id, name").eq("company_id", company_id).order("name");
+          }
+          if (r.error) throw r.error;
+          return r.data || [];
+        };
+
+        const renderClients = (filterText = "") => {
+          if (!clientSel) return;
+
+          const q = String(filterText || "").trim().toLowerCase();
+          const list = (clients || []).filter((c) => {
+            const name = String(c.name || "").toLowerCase();
+            const phone = String(c.phone || "").toLowerCase();
+            return !q || name.includes(q) || phone.includes(q);
+          });
+
+          clientSel.innerHTML =
+            `<option value="">— Selecionar cliente —</option>` +
+            list
+              .map((c) => {
+                const label = `${c.name}${c.phone ? ` • ${c.phone}` : ""}`;
+                return `<option value="${c.id}">${label}</option>`;
+              })
+              .join("");
+
+          if (clientHint) {
+            clientHint.textContent = list.length ? "Pagamento parcial cria dívida ligada ao cliente." : "⚠️ Sem clientes. Crie em Clientes.";
+          }
+        };
 
         try {
-          const name = (document.getElementById("cliName")?.value || "").trim();
-          if (!name) throw new Error("Nome é obrigatório.");
-
-          fm.textContent = "A guardar…";
-const company_id = DC_STATE.state.session.companyId;
-if (!company_id) throw new Error("Sessão sem companyId (UUID). Faz login novamente.");
-
-   await DC_DB.createClient({
-  company_id,
-  name,
-  phone: (document.getElementById("cliPhone")?.value || "").trim(),
-  email: (document.getElementById("cliEmail")?.value || "").trim(),
-  address: (document.getElementById("cliAddress")?.value || "").trim()
-});
-
-
-
-          close();
-          await load();
-          DC_HELPERS.toast("Cliente criado!", "ok");
-        } catch (err) {
-          fm.textContent = "❌ " + (err?.message || err);
-          DC_HELPERS.toast(err?.message || "Erro", "err");
+          clients = await loadClientsSafe();
+          renderClients("");
+        } catch (e) {
+          clients = [];
+          if (clientHint) clientHint.textContent = "❌ Erro ao carregar clientes: " + (e?.message || e);
+          if (clientSel) clientSel.innerHTML = `<option value="">— Erro —</option>`;
         }
-      }, { once: true });
-    });
 
-    await load();
-  };
+        DC_HELPERS.bindOnce(clientQ, "clientQ", "input", (e) => renderClients(e.target.value));
 
-  return { initClientsScreen };
-})();
+        // contas
+        const accSel = document.getElementById("posAccount");
+        if (accSel) {
+          try {
+            const accs = await DC_DB.listCashAccounts(company_id);
+            accSel.innerHTML = `<option value="">— Não movimentar —</option>` + accs.map((a) => `<option value="${a.id}">${a.name} (${a.type})</option>`).join("");
+          } catch {
+            accSel.innerHTML = `<option value="">— Não movimentar —</option>`;
+          }
+        }
 
- return {
-  refreshLowStockBadge,
-  openLowStockModal,
-  initStockScreen,
-  initSalesScreen,
-  clients: CLIENTS_UI
-};
+        // produtos
+        const { data: products, error: pe } = await sb
+          .from("products")
+          .select("id, name, unit, product_type, price, min_qty, is_active")
+          .eq("company_id", company_id)
+          .order("name");
+        if (pe) throw pe;
 
-})();
+        const activeProducts = (products || []).filter((p) => p.is_active !== false);
 
+        const cart = new Map();
+
+        const $prodWrap = document.getElementById("posProducts");
+        const $prodMsg = document.getElementById("posProdMsg");
+        const $cartBody = document.getElementById("posCartBody");
+        const $sum = document.getElementById("posSummary");
+        const $msg = document.getElementById("posMsg");
+
+        const fmt = (n) => Number(n || 0).toLocaleString();
+        const money = (n) => Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+        const getOnHandMap = async (warehouse_id) => {
+          const { data: rows, error } = await sb
+            .from("vw_stock_levels")
+            .select("product_id, on_hand, min_qty")
+            .eq("company_id", company_id)
+            .eq("warehouse_id", warehouse_id);
+          if (error) throw error;
+
+          const map = {};
+          (rows || []).forEach((r) => {
+            map[r.product_id] = r;
+          });
+          return map;
+        };
+
+        let onHandMap = await getOnHandMap(whSel.value);
+
+        const renderProducts = (filterText = "") => {
+          const q = String(filterText || "").trim().toLowerCase();
+          const list = (activeProducts || []).filter((p) => !q || p.name.toLowerCase().includes(q));
+
+          if (!$prodWrap) return;
+          if (!list.length) {
+            $prodWrap.innerHTML = `<div class="muted small">Sem produtos.</div>`;
+            return;
+          }
+
+          $prodWrap.innerHTML = list
+            .map((p) => {
+              const lvl = onHandMap[p.id];
+              const on_hand = lvl?.on_hand ?? 0;
+              const min_qty = lvl?.min_qty ?? p.min_qty ?? 0;
+
+              const low = Number(on_hand) <= Number(min_qty);
+              const badge = low ? "⚠️" : "✅";
+
+              return `
+                <div class="card" style="padding:12px;display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap">
+                  <div style="min-width:260px">
+                    <div style="font-weight:950">${p.name} <span class="muted small">(${p.product_type})</span></div>
+                    <div class="muted small">${badge} Stock: <b>${fmt(on_hand)}</b> ${p.unit || ""} | Mín: <b>${fmt(min_qty)}</b></div>
+                  </div>
+                  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+                    <div style="font-weight:950">Preço: ${money(p.price || 0)}</div>
+                    <button data-add="${p.id}" type="button"
+                      style="padding:10px 12px;border-radius:12px;border:1px solid rgba(0,0,0,.12);font-weight:900;cursor:pointer">
+                      + Adicionar
+                    </button>
+                  </div>
+                </div>
+              `;
+            })
+            .join("");
+
+          $prodWrap.querySelectorAll("[data-add]").forEach((btn) => {
+            btn.addEventListener("click", () => {
+              const pid = btn.getAttribute("data-add");
+              const p = activeProducts.find((x) => x.id === pid);
+              if (!p) return;
+
+              const cur = cart.get(pid);
+              const newQty = (cur?.qty || 0) + 1;
+              cart.set(pid, { product: p, qty: newQty, price: Number(p.price || 0) });
+              renderCart();
+            });
+          });
+        };
+
+        const renderCart = () => {
+          const items = Array.from(cart.values());
+          if (!$cartBody || !$sum) return;
+
+          if (!items.length) {
+            $cartBody.innerHTML = `<tr><td class="muted small" style="padding:10px" colspan="5">Carrinho vazio.</td></tr>`;
+            $sum.textContent = "—";
+            return;
+          }
+
+          const total = items.reduce((a, it) => a + it.qty * it.price, 0);
+
+          $cartBody.innerHTML = items
+            .map((it) => {
+              const p = it.product;
+              const line = it.qty * it.price;
+              return `
+                <tr>
+                  <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);font-weight:900">${p.name}</td>
+                  <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);text-align:right">${money(it.price)}</td>
+                  <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);text-align:right">
+                    <input data-qty="${p.id}" type="number" step="0.001" min="0" value="${it.qty}"
+                      style="width:110px;padding:8px;border-radius:10px;border:1px solid rgba(0,0,0,.12);text-align:right"/>
+                  </td>
+                  <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);text-align:right;font-weight:900">${money(line)}</td>
+                  <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);text-align:right">
+                    <button data-rm="${p.id}" type="button"
+                      style="padding:8px 10px;border-radius:10px;border:1px solid rgba(0,0,0,.12);font-weight:900;cursor:pointer">
+                      Remover
+                    </button>
+                  </td>
+                </tr>
+              `;
+            })
+            .join("");
+
+          $sum.textContent = `Itens: ${items.length} | Total: ${money(total)}`;
+
+          $cartBody.querySelectorAll("[data-qty]").forEach((inp) => {
+            inp.addEventListener("change", () => {
+              const pid = inp.getAttribute("data-qty");
+              const v = Number(inp.value || 0);
+              if (!pid) return;
+
+              if (v <= 0) cart.delete(pid);
+              else {
+                const cur = cart.get(pid);
+                if (cur) cart.set(pid, { ...cur, qty: v });
+              }
+              renderCart();
+            });
+          });
+
+          $cartBody.querySelectorAll("[data-rm]").forEach((btn) => {
+            btn.addEventListener("click", () => {
+              cart.delete(btn.getAttribute("data-rm"));
+              renderCart();
+            });
+          });
+        };
+
+        DC_HELPERS.bindOnce(document.getElementById("posSearch"), "posSearch", "input", (e) => renderProducts(e.target.value));
+
+        DC_HELPERS.bindOnce(whSel, "posWarehouse", "change", async () => {
+          try {
+            if ($prodMsg) $prodMsg.textContent = "A atualizar stock…";
+            onHandMap = await getOnHandMap(whSel.value);
+            renderProducts(document.getElementById("posSearch")?.value || "");
+            if ($prodMsg) $prodMsg.textContent = "";
+          } catch (err) {
+            if ($prodMsg) $prodMsg.textContent = "❌ " + (err?.message || err);
+          }
+        });
+
+        DC_HELPERS.bindOnce(document.getElementById("posClear"), "posClear", "click", () => {
+          cart.clear();
+          if ($msg) $msg.textContent = "";
+          renderCart();
+        });
+
+        // FINALIZAR VENDA
+        DC_HELPERS.bindOnce(document.getElementById("posCheckout"), "posCheckout", "click", async () => {
+          try {
+            if ($msg) $msg.textContent = "A finalizar…";
+
+            const items = Array.from(cart.values()).map((it) => ({
+              product_id: it.product.id,
+              qty: Number(it.qty),
+              price: Number(it.price),
+            }));
+            if (!items.length) throw new Error("Carrinho vazio.");
+
+            const warehouse_id = whSel.value;
+            const ref_note = document.getElementById("posNote")?.value || "Venda POS";
+
+            const total = items.reduce((a, it) => a + it.qty * it.price, 0);
+
+            const received = Number(document.getElementById("posPaid")?.value || 0);
+            const paid = Math.min(received, total);
+            const change = Math.max(received - total, 0);
+            const due = Math.max(total - received, 0);
+
+            const client_id = document.getElementById("posClient")?.value || null;
+
+            const sale_id = await DC_DB.createSale({
+              company_id,
+              branch_id,
+              warehouse_id,
+              items,
+              ref_note,
+            });
+
+            const status = due > 0 ? (paid > 0 ? "PARTIAL" : "DUE") : "PAID";
+
+            await DC_DB.supabase.from("sales").update({ status, total, ref_note, client_id }).eq("id", sale_id);
+
+            const account_id = document.getElementById("posAccount")?.value || null;
+            const method = document.getElementById("posPayMethod")?.value || "cash";
+
+            if (paid > 0) {
+              try {
+                await DC_DB.supabase.from("sale_payments").insert({
+                  company_id,
+                  sale_id,
+                  account_id,
+                  method,
+                  amount: paid,
+                  created_by: DC_STATE.state.session.userId || null,
+                });
+              } catch (e) {
+                console.warn("sale_payments não gravou:", e?.message || e);
+              }
+
+              if (account_id) {
+                await DC_DB.createCashMove({
+                  company_id,
+                  branch_id,
+                  account_id,
+                  move_type: "IN",
+                  amount: paid,
+                  ref_type: "sale",
+                  ref_id: sale_id,
+                  note: `Recebimento venda | ${ref_note}`,
+                });
+              }
+            }
+
+            if (due > 0) {
+              if (!client_id) throw new Error("Pagamento parcial exige selecionar cliente.");
+              try {
+                await DC_DB.supabase.from("client_ledger").insert({
+                  company_id,
+                  client_id,
+                  entry_type: "DEBIT",
+                  amount: due,
+                  ref_type: "sale",
+                  ref_id: sale_id,
+                  note: `Dívida da venda | ${ref_note}`,
+                  created_by: DC_STATE.state.session.userId || null,
+                });
+              } catch (e) {
+                console.warn("client_ledger não gravou:", e?.message || e);
+              }
+            }
+
+            cart.clear();
+            renderCart();
+
+            onHandMap = await getOnHandMap(warehouse_id);
+            renderProducts(document.getElementById("posSearch")?.value || "");
+
+            await refreshLowStockBadge();
+
+            if ($msg) {
+              $msg.textContent =
+                `✅ Venda: ${sale_id} | Total: ${money(total)} | Pago: ${money(paid)}` +
+                (due > 0 ? ` | Dívida: ${money(due)}` : "") +
+                (change > 0 ? ` | Troco: ${money(change)}` : "");
+            }
+
+            DC_HELPERS.toast("Venda finalizada!", "ok");
+          } catch (err) {
+            if ($msg) $msg.textContent = "❌ " + (err?.message || err);
+            DC_HELPERS.toast(err?.message || "Erro", "err");
+          }
+        });
+
+        renderProducts("");
+        renderCart();
+        await refreshLowStockBadge();
+      };
+
+      return {
+        refreshLowStockBadge,
+        openLowStockModal,
+        initStockScreen,
+        initSalesScreen,
+      };
+    })();
+
+    /* =========================
+       CLIENTS_UI
+    ========================= */
+    const CLIENTS_UI = (() => {
+      const openClientModal = ({ mode, client }) => {
+        const old = document.getElementById("dcClientModal");
+        if (old) old.remove();
+
+        const overlay = document.createElement("div");
+        overlay.id = "dcClientModal";
+        overlay.style.cssText = `
+          position:fixed;inset:0;background:rgba(0,0,0,.55);
+          display:flex;align-items:center;justify-content:center;
+          z-index:999999;padding:18px;
+        `;
+
+        const box = document.createElement("div");
+        box.style.cssText = `
+          width:min(560px, 100%); background:#fff; border-radius:18px;
+          padding:16px 16px 12px; box-shadow:0 20px 60px rgba(0,0,0,.25);
+          border:1px solid rgba(0,0,0,.08);
+        `;
+
+        const title = mode === "edit" ? "Editar Cliente" : "Novo Cliente";
+
+        box.innerHTML = `
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+            <div style="font-weight:950;font-size:16px">👤 ${title}</div>
+            <button id="dcCloseClient" style="border:none;background:transparent;font-size:18px;font-weight:900;cursor:pointer">✕</button>
+          </div>
+
+          <div class="divider" style="margin:12px 0"></div>
+
+          <form id="cliForm" style="display:grid;gap:10px">
+            <input id="cliName" placeholder="Nome *" value="${client?.name || ""}"
+              style="width:100%;padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12)"/>
+            <input id="cliPhone" placeholder="Telefone" value="${client?.phone || ""}"
+              style="width:100%;padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12)"/>
+            <input id="cliEmail" placeholder="Email" value="${client?.email || ""}"
+              style="width:100%;padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12)"/>
+            <input id="cliAddress" placeholder="Endereço" value="${client?.address || ""}"
+              style="width:100%;padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12)"/>
+
+            <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px">
+              <button type="submit" id="cliSave"
+                style="flex:1;min-width:180px;padding:12px 14px;border-radius:14px;
+                  border:1px solid rgba(0,0,0,.12); background:#0ea5e9;color:#fff;font-weight:900;cursor:pointer">
+                Guardar
+              </button>
+
+              <button type="button" id="cliCancel"
+                style="flex:1;min-width:180px;padding:12px 14px;border-radius:14px;
+                  border:1px solid rgba(0,0,0,.12); background:#fff;font-weight:900;cursor:pointer">
+                Cancelar
+              </button>
+            </div>
+
+            <p id="cliFormMsg" class="muted small" style="margin:6px 0 0"></p>
+          </form>
+        `;
+
+        overlay.appendChild(box);
+        document.body.appendChild(overlay);
+
+        const close = () => overlay.remove();
+        document.getElementById("dcCloseClient")?.addEventListener("click", close);
+        document.getElementById("cliCancel")?.addEventListener("click", close);
+        overlay.addEventListener("click", (e) => {
+          if (e.target === overlay) close();
+        });
+
+        return { overlay, close };
+      };
+
+      const initClientsScreen = async () => {
+        if (DC_STATE.state.ui.currentRoute !== "clients") return;
+
+        const company_id = DC_STATE.state.session.companyId;
+        if (!company_id) return;
+
+        const body = document.getElementById("cliBody");
+        const msg = document.getElementById("cliMsg");
+        const qInp = document.getElementById("cliSearch");
+        const showInactive = document.getElementById("cliShowInactive");
+
+        let cache = [];
+
+        const matches = (c, q) => {
+          q = String(q || "").trim().toLowerCase();
+          if (!q) return true;
+          return (
+            String(c.name || "").toLowerCase().includes(q) ||
+            String(c.phone || "").toLowerCase().includes(q) ||
+            String(c.email || "").toLowerCase().includes(q)
+          );
+        };
+
+        const render = () => {
+          const q = qInp?.value || "";
+          const list = (cache || []).filter((c) => matches(c, q));
+
+          if (!body) return;
+          if (!list.length) {
+            body.innerHTML = `<tr><td class="muted small" style="padding:10px" colspan="5">Sem clientes.</td></tr>`;
+            return;
+          }
+
+          body.innerHTML = list
+            .map(
+              (c) => `
+              <tr>
+                <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);font-weight:900">${c.name || "—"}</td>
+                <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06)">${c.phone || "—"}</td>
+                <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06)">${c.email || "—"}</td>
+                <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);font-weight:900">
+                  ${c.is_active ? "✅ Ativo" : "⛔ Inativo"}
+                </td>
+                <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);text-align:right">
+                  <button data-edit="${c.id}" type="button"
+                    style="padding:8px 10px;border-radius:10px;border:1px solid rgba(0,0,0,.12);font-weight:900;cursor:pointer">
+                    Editar
+                  </button>
+                  <button data-toggle="${c.id}" type="button"
+                    style="margin-left:8px;padding:8px 10px;border-radius:10px;border:1px solid rgba(0,0,0,.12);font-weight:900;cursor:pointer">
+                    ${c.is_active ? "Desativar" : "Ativar"}
+                  </button>
+                </td>
+              </tr>
+            `
+            )
+            .join("");
+
+          body.querySelectorAll("[data-edit]").forEach((btn) => {
+            btn.addEventListener("click", () => {
+              const id = btn.getAttribute("data-edit");
+              const client = cache.find((x) => x.id === id);
+              if (!client) return;
+
+              const { close } = openClientModal({ mode: "edit", client });
+
+              document.getElementById("cliForm")?.addEventListener(
+                "submit",
+                async (e) => {
+                  e.preventDefault();
+                  const fm = document.getElementById("cliFormMsg");
+
+                  try {
+                    const name = (document.getElementById("cliName")?.value || "").trim();
+                    if (!name) throw new Error("Nome é obrigatório.");
+
+                    if (fm) fm.textContent = "A guardar…";
+
+                    await DC_DB.updateClient({
+                      company_id,
+                      id: client.id,
+                      name,
+                      phone: (document.getElementById("cliPhone")?.value || "").trim(),
+                      email: (document.getElementById("cliEmail")?.value || "").trim(),
+                      address: (document.getElementById("cliAddress")?.value || "").trim(),
+                    });
+
+                    close();
+                    await load();
+                    DC_HELPERS.toast("Cliente atualizado!", "ok");
+                  } catch (err) {
+                    if (fm) fm.textContent = "❌ " + (err?.message || err);
+                    DC_HELPERS.toast(err?.message || "Erro", "err");
+                  }
+                },
+                { once: true }
+              );
+            });
+          });
+
+          body.querySelectorAll("[data-toggle]").forEach((btn) => {
+            btn.addEventListener("click", async () => {
+              const id = btn.getAttribute("data-toggle");
+              const client = cache.find((x) => x.id === id);
+              if (!client) return;
+
+              try {
+                await DC_DB.setClientActive({ company_id, id, is_active: !client.is_active });
+                await load();
+                DC_HELPERS.toast(client.is_active ? "Cliente desativado." : "Cliente ativado.", "info");
+              } catch (err) {
+                DC_HELPERS.toast(err?.message || "Erro", "err");
+              }
+            });
+          });
+        };
+
+        const load = async () => {
+          try {
+            if (msg) msg.textContent = "A carregar…";
+            const include_inactive = !!showInactive?.checked;
+
+            cache = await DC_DB.listClients(company_id, { include_inactive });
+
+            if (msg) msg.textContent = "";
+            render();
+          } catch (err) {
+            if (msg) msg.textContent = "❌ " + (err?.message || err);
+            if (body) body.innerHTML = `<tr><td style="padding:10px" colspan="5">Erro ao carregar.</td></tr>`;
+          }
+        };
+
+        DC_HELPERS.bindOnce(document.getElementById("cliRefresh"), "cliRefresh", "click", () => load());
+        DC_HELPERS.bindOnce(qInp, "cliSearch", "input", () => render());
+        DC_HELPERS.bindOnce(showInactive, "cliShowInactive", "change", () => load());
+
+        DC_HELPERS.bindOnce(document.getElementById("cliNew"), "cliNew", "click", () => {
+          const { close } = openClientModal({ mode: "new", client: null });
+
+          document.getElementById("cliForm")?.addEventListener(
+            "submit",
+            async (e) => {
+              e.preventDefault();
+              const fm = document.getElementById("cliFormMsg");
+
+              try {
+                const name = (document.getElementById("cliName")?.value || "").trim();
+                if (!name) throw new Error("Nome é obrigatório.");
+
+                if (fm) fm.textContent = "A guardar…";
+
+                const company_id2 = DC_STATE.state.session.companyId;
+                if (!company_id2) throw new Error("Sessão sem companyId (UUID). Faz login novamente.");
+
+                await DC_DB.createClient({
+                  company_id: company_id2,
+                  name,
+                  phone: (document.getElementById("cliPhone")?.value || "").trim(),
+                  email: (document.getElementById("cliEmail")?.value || "").trim(),
+                  address: (document.getElementById("cliAddress")?.value || "").trim(),
+                });
+
+                close();
+                await load();
+                DC_HELPERS.toast("Cliente criado!", "ok");
+              } catch (err) {
+                if (fm) fm.textContent = "❌ " + (err?.message || err);
+                DC_HELPERS.toast(err?.message || "Erro", "err");
+              }
+            },
+            { once: true }
+          );
+        });
+
+        await load();
+      };
+
+      return { initClientsScreen };
+    })();
 
     /* =========================
        ROUTES (cards)
@@ -1850,6 +1805,9 @@ if (!company_id) throw new Error("Sessão sem companyId (UUID). Faz login novame
     const cards = (route) => {
       const plan = DC_STATE.state.session.plan;
 
+      // ⚠️ Mantive os teus cards (HTML grande) exatamente como estavam,
+      // porque mexer nisso sem necessidade cria bugs.
+      // (Aqui fica igual ao teu original)
       const map = {
         dashboard: `
           <div class="card">
@@ -1857,7 +1815,8 @@ if (!company_id) throw new Error("Sessão sem companyId (UUID). Faz login novame
             <p class="muted">Visão geral: vendas, caixa, stock, alertas e KPIs.</p>
           </div>
         `,
-       sales: `
+        // ✅ (copiei integral do teu script, sem alterações)
+        sales: `
   <div class="card">
     <h2 class="subtitle">Vendas (POS)</h2>
     <p class="muted">Seleciona produto, adiciona ao carrinho e finaliza a venda.</p>
@@ -1972,7 +1931,6 @@ if (!company_id) throw new Error("Sessão sem companyId (UUID). Faz login novame
     </div>
   </div>
 `,
-
         stock: `
           <div class="card">
             <h2 class="subtitle">Stock</h2>
@@ -2066,7 +2024,7 @@ if (!company_id) throw new Error("Sessão sem companyId (UUID). Faz login novame
           </div>
         `,
         cash: `<div class="card"><h2 class="subtitle">Caixa</h2><p class="muted">Entradas, saídas e saldo.</p></div>`,
-       clients: `
+        clients: `
   <div class="card">
     <h2 class="subtitle">Clientes</h2>
     <p class="muted">Crie, pesquise e edite clientes. (Pagamento parcial no POS exige cliente.)</p>
@@ -2083,22 +2041,21 @@ if (!company_id) throw new Error("Sessão sem companyId (UUID). Faz login novame
         </label>
       </div>
 
-<div class="card" style="padding:12px">
-  <div class="subtitle subtitle--sm">Ações</div>
+      <div class="card" style="padding:12px">
+        <div class="subtitle subtitle--sm">Ações</div>
 
-  <button id="cliNew" type="button"
-    style="margin-top:8px;padding:12px 14px;border-radius:14px;border:1px solid rgba(0,0,0,.12);font-weight:900;cursor:pointer">
-    + Novo Cliente
-  </button>
+        <button id="cliNew" type="button"
+          style="margin-top:8px;padding:12px 14px;border-radius:14px;border:1px solid rgba(0,0,0,.12);font-weight:900;cursor:pointer">
+          + Novo Cliente
+        </button>
 
-  <button id="cliRefresh" type="button"
-    style="margin-top:10px;padding:10px 12px;border-radius:12px;border:1px solid rgba(0,0,0,.12);font-weight:900;cursor:pointer">
-    Atualizar Lista
-  </button>
+        <button id="cliRefresh" type="button"
+          style="margin-top:10px;padding:10px 12px;border-radius:12px;border:1px solid rgba(0,0,0,.12);font-weight:900;cursor:pointer">
+          Atualizar Lista
+        </button>
 
-  <p id="cliMsg" class="muted small" style="margin-top:10px"></p>
-</div>
-
+        <p id="cliMsg" class="muted small" style="margin-top:10px"></p>
+      </div>
     </div>
 
     <div class="card" style="padding:12px;margin-top:12px">
@@ -2124,13 +2081,12 @@ if (!company_id) throw new Error("Sessão sem companyId (UUID). Faz login novame
     </div>
   </div>
 `,
-
         suppliers: `<div class="card"><h2 class="subtitle">Fornecedores</h2><p class="muted">Compras e pagamentos.</p></div>`,
         settings: `<div class="card"><h2 class="subtitle">Configurações</h2><p class="muted">Empresa e utilizadores.</p></div>`,
         bookings: `<div class="card"><h2 class="subtitle">Reservas</h2><p class="muted">Salas/estúdios/co-work.</p></div>`,
         patients: `<div class="card"><h2 class="subtitle">Pacientes</h2><p class="muted">Cadastro e histórico.</p></div>`,
         appointments: `<div class="card"><h2 class="subtitle">Agendamentos</h2><p class="muted">Consultas e agenda.</p></div>`,
-        production: `<div class="card"><h2 class="subtitle">Produção</h2><p class="muted">Registos e custos.</p></div>`
+        production: `<div class="card"><h2 class="subtitle">Produção</h2><p class="muted">Registos e custos.</p></div>`,
       };
 
       return map[route] || map.dashboard;
@@ -2150,7 +2106,7 @@ if (!company_id) throw new Error("Sessão sem companyId (UUID). Faz login novame
       const modules = DC_STATE.state.ui.modules || [];
       $$(".nav__item").forEach((b) => {
         const route = b.getAttribute("data-route");
-        b.style.display = (modules.length && !modules.includes(route)) ? "none" : "";
+        b.style.display = modules.length && !modules.includes(route) ? "none" : "";
       });
     };
 
@@ -2170,9 +2126,9 @@ if (!company_id) throw new Error("Sessão sem companyId (UUID). Faz login novame
 
       const planChip = $("#planChip");
       const p = s.plan || "basic";
-      planChip.textContent = p === "inteligente" ? "Inteligente" : (p === "pro" ? "Pro" : "Basic");
+      planChip.textContent = p === "inteligente" ? "Inteligente" : p === "pro" ? "Pro" : "Basic";
       planChip.classList.remove("pill--blue", "pill--green", "pill--orange");
-      planChip.classList.add(p === "basic" ? "pill--blue" : (p === "pro" ? "pill--green" : "pill--orange"));
+      planChip.classList.add(p === "basic" ? "pill--blue" : p === "pro" ? "pill--green" : "pill--orange");
 
       $("#userName").textContent = s.username || "Utilizador";
       $("#userRole").textContent = s.role || "Perfil";
@@ -2195,24 +2151,14 @@ if (!company_id) throw new Error("Sessão sem companyId (UUID). Faz login novame
         setHeader(u.currentRoute);
 
         renderRoute(u.currentRoute);
-if (u.currentRoute === "sales") {
-  setTimeout(() => STOCK_UI.initSalesScreen(), 0);
-}
 
-
-
+        // init por rota (evita listeners duplicados)
+        if (u.currentRoute === "sales") setTimeout(() => STOCK_UI.initSalesScreen(), 0);
+        if (u.currentRoute === "stock") setTimeout(() => STOCK_UI.initStockScreen(), 0);
+        if (u.currentRoute === "clients") setTimeout(() => CLIENTS_UI.initClientsScreen(), 0);
 
         // badge sempre atual
         STOCK_UI.refreshLowStockBadge();
-
-        // init stock apenas quando for rota stock
-        if (u.currentRoute === "stock") {
-          setTimeout(() => STOCK_UI.initStockScreen(), 0);
-        }
-       if (u.currentRoute === "clients") {
-  setTimeout(() => DC_UI.clients.initClientsScreen(), 0);
-}
-
       }
     };
 
@@ -2225,9 +2171,8 @@ if (u.currentRoute === "sales") {
       renderRoute,
       syncAll,
 
- stock: STOCK_UI,
-clients: STOCK_UI.clients
-
+      stock: STOCK_UI,
+      clients: CLIENTS_UI,
     };
   })();
 
@@ -2241,11 +2186,7 @@ clients: STOCK_UI.clients
       $("#formLogin")?.addEventListener("submit", async (e) => {
         e.preventDefault();
         try {
-          await DC_LOGIC.loginFlow(
-            $("#loginCompanyId")?.value,
-            $("#loginUser")?.value,
-            $("#loginPass")?.value
-          );
+          await DC_LOGIC.loginFlow($("#loginCompanyId")?.value, $("#loginUser")?.value, $("#loginPass")?.value);
           DC_UI.syncAll();
         } catch (err) {
           toast(err.message || "Falha no login.", "err");
@@ -2284,7 +2225,7 @@ clients: STOCK_UI.clients
           adminFullName: $("#aFullName")?.value,
           adminUser: $("#aUser")?.value,
           adminPass: $("#aPass")?.value,
-          adminPass2: $("#aPass2")?.value
+          adminPass2: $("#aPass2")?.value,
         };
 
         try {
@@ -2304,19 +2245,14 @@ clients: STOCK_UI.clients
           DC_UI.highlightRoute(route);
           DC_UI.setHeader(route);
           DC_UI.renderRoute(route);
-  
-
-
 
           // badge sempre
           DC_UI.stock.refreshLowStockBadge();
 
-          // init stock ao entrar
+          // init por rota
           if (route === "stock") DC_UI.stock.initStockScreen();
-           if (route === "sales") DC_UI.stock.initSalesScreen();
-         if (route === "clients") DC_UI.clients.initClientsScreen();
-
-
+          if (route === "sales") DC_UI.stock.initSalesScreen();
+          if (route === "clients") DC_UI.clients.initClientsScreen();
         });
       });
 
@@ -2362,7 +2298,4 @@ clients: STOCK_UI.clients
   });
 
   window.DC_ONE = { DC_CONFIG, DC_STATE, DC_HELPERS, DC_DB, DC_LOGIC, DC_UI };
-
 })();
-
-
