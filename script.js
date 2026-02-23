@@ -400,24 +400,33 @@ async createCashMove({ company_id, branch_id, account_id, move_type, amount, ref
 // =====================
 // CLIENTES (CRUD)
 // =====================
-async listClients(company_id, { include_inactive = false } = {}) {
-  let q = supabase
+async createClient({ company_id, name, phone, email }) {
+  const rawCreatedBy = DC_STATE.state.session.userId || null;
+
+  const payload = {
+    company_id,
+    name,
+    phone: phone?.trim() ? phone.trim() : null,
+    // email só se existir coluna:
+    // email: email?.trim() ? email.trim() : null,
+    is_active: true,
+    created_by: this.isUUID(rawCreatedBy) ? rawCreatedBy : null
+  };
+
+  const { data, error } = await supabase
     .from("clients")
+    .insert([payload])
     .select("id,name,phone,is_active,created_at")
-    .eq("company_id", company_id)
-    .order("name");
+    .single();
 
-  if (!include_inactive) q = q.eq("is_active", true);
-
-  const { data, error } = await q;
   if (error) throw error;
-  return data || [];
+  return data;
 },
 
 
-function isUUID(v) {
+isUUID(v) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v || "");
-}
+},
 
 async createClient({ company_id, name, phone, email }) {
   const rawCreatedBy = DC_STATE.state.session.userId || null;
@@ -451,13 +460,17 @@ async createClient({ company_id, name, phone, email }) {
 
 
 
-async updateClient({ company_id, id, name, phone }) {
+async updateClient({ company_id, id, name, phone, email }) {
+  const payload = {
+    name,
+    phone: phone?.trim() ? phone.trim() : null,
+    // só se a coluna existir:
+    // email: email?.trim() ? email.trim() : null,
+  };
+
   const { data, error } = await supabase
     .from("clients")
-    .update({
-      name,
-      phone: phone || null
-    })
+    .update(payload)
     .eq("company_id", company_id)
     .eq("id", id)
     .select("id,name,phone,is_active,created_at")
@@ -465,7 +478,7 @@ async updateClient({ company_id, id, name, phone }) {
 
   if (error) throw error;
   return data;
-}
+},
 
 
     };
@@ -2138,10 +2151,8 @@ if (u.currentRoute === "sales") {
       renderRoute,
       syncAll,
 
-      // expõe stock ui
-      stock: STOCK_UI,
-        // ✅ expõe clients ui
- clients: STOCK_UI.clients
+ stock: STOCK_UI,
+clients: STOCK_UI.clients
 
     };
   })();
