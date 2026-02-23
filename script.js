@@ -101,7 +101,14 @@
       const map = DC_CONFIG.TEMPLATE_MODULES;
       return map[branch] || map.default;
     };
-
+const bindOnce = (el, key, eventName, handler) => {
+  if (!el) return;
+  // dataset com chave “segura” (sem caracteres estranhos)
+  const k = `dcBound${String(key).replace(/\W/g, "")}${eventName}`;
+  if (el.dataset[k] === "1") return;
+  el.dataset[k] = "1";
+  el.addEventListener(eventName, handler);
+};
     const toast = (msg, type = "info") => {
       const wrapId = "toastWrap";
       let wrap = document.getElementById(wrapId);
@@ -228,7 +235,12 @@
     return {
       $, $$, sanitize, slug,
       generateCompanyCode, makeAuthEmail, pickModulesForBranch,
-      toast, showCompanyIdModal, applyLastCompanyIdToLogin
+      toast, showCompanyIdModal, applyLastCompanyIdToLogin,
+       
+  $, $$, sanitize, slug,
+  generateCompanyCode, makeAuthEmail, pickModulesForBranch,
+  toast, showCompanyIdModal, applyLastCompanyIdToLogin,
+  bindOnce
     };
   })();
 
@@ -1032,8 +1044,7 @@ const STOCK_UI = (() => {
     });
 
     // IN submit 1x
-    bindOnce(document.getElementById("stockInForm"), "in", "submit", async (e) => {
-      e.preventDefault();
+ DC_HELPERS.bindOnce(document.getElementById("stockInForm"), "in", "submit", async (e) => { ... })
       try {
         await STOCK_LOGIC.createStockIn({
           company_id,
