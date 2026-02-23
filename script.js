@@ -397,6 +397,8 @@ async createCashMove({ company_id, branch_id, account_id, move_type, amount, ref
   if (error) throw error;
   return true;
 },
+       };
+     
 // =====================
 // CLIENTES (CRUD) - schema-safe
 // =====================
@@ -532,16 +534,16 @@ async function setClientActive({ company_id, id, is_active }) {
       toast(msg, "err");
     });
 
-   return {
-  supabase,
-  createCompanyWithAdmin,
-  login,
-  restore,
-  logout,
-  transferStock,
-  createSale,
-  listCashAccounts,
-  createCashMove,
+ return {
+  supabase: api.supabase,
+  createCompanyWithAdmin: api.createCompanyWithAdmin,
+  login: api.login,
+  restore: api.restore,
+  logout: api.logout,
+  transferStock: api.transferStock,
+  createSale: api.createSale,
+  listCashAccounts: api.listCashAccounts,
+  createCashMove: api.createCashMove,
 
   // clientes
   listClients,
