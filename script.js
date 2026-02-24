@@ -544,6 +544,165 @@
       toast(msg, "err");
     });
 
+// =====================
+// BRANCHES / WAREHOUSES / PRODUCTS (CRUD básico)
+// =====================
+async function listBranches(company_id) {
+  // tenta com is_active, fallback sem
+  let r = await supabase
+    .from("branches")
+    .select("id,name,is_active,created_at")
+    .eq("company_id", company_id)
+    .order("created_at", { ascending: true });
+
+  if (r.error) {
+    r = await supabase
+      .from("branches")
+      .select("id,name,created_at")
+      .eq("company_id", company_id)
+      .order("created_at", { ascending: true });
+  }
+
+  if (r.error) throw r.error;
+  const data = r.data || [];
+  return data.map(b => ({ ...b, is_active: ("is_active" in b) ? b.is_active !== false : true }));
+}
+
+async function createBranch({ company_id, name }) {
+  const payload = {
+    company_id,
+    name: String(name || "").trim(),
+    is_active: true
+  };
+
+  // se a coluna is_active não existir, tenta sem ela
+  let r = await supabase.from("branches").insert([payload]).select("id,name,is_active,created_at").single();
+  if (r.error) {
+    const p2 = { company_id, name: payload.name };
+    r = await supabase.from("branches").insert([p2]).select("id,name,created_at").single();
+  }
+  if (r.error) throw r.error;
+
+  const row = r.data;
+  return { ...row, is_active: ("is_active" in row) ? row.is_active !== false : true };
+}
+
+async function setBranchActive({ company_id, id, is_active }) {
+  // se não existir is_active, não faz nada
+  const test = await supabase.from("branches").select("is_active").limit(1);
+  if (test.error) return true;
+
+  const { error } = await supabase
+    .from("branches")
+    .update({ is_active: !!is_active })
+    .eq("company_id", company_id)
+    .eq("id", id);
+
+  if (error) throw error;
+  return true;
+}
+
+async function listWarehouses(company_id) {
+  let r = await supabase
+    .from("warehouses")
+    .select("id,name,branch_id,is_active,created_at")
+    .eq("company_id", company_id)
+    .order("created_at", { ascending: true });
+
+  if (r.error) {
+    r = await supabase
+      .from("warehouses")
+      .select("id,name,branch_id,created_at")
+      .eq("company_id", company_id)
+      .order("created_at", { ascending: true });
+  }
+
+  if (r.error) throw r.error;
+  const data = r.data || [];
+  return data.map(w => ({ ...w, is_active: ("is_active" in w) ? w.is_active !== false : true }));
+}
+
+async function createWarehouse({ company_id, branch_id, name }) {
+  const payload = {
+    company_id,
+    branch_id,
+    name: String(name || "").trim(),
+    is_active: true
+  };
+
+  let r = await supabase.from("warehouses").insert([payload]).select("id,name,branch_id,is_active,created_at").single();
+  if (r.error) {
+    const p2 = { company_id, branch_id, name: payload.name };
+    r = await supabase.from("warehouses").insert([p2]).select("id,name,branch_id,created_at").single();
+  }
+  if (r.error) throw r.error;
+
+  const row = r.data;
+  return { ...row, is_active: ("is_active" in row) ? row.is_active !== false : true };
+}
+
+async function setWarehouseActive({ company_id, id, is_active }) {
+  const test = await supabase.from("warehouses").select("is_active").limit(1);
+  if (test.error) return true;
+
+  const { error } = await supabase
+    .from("warehouses")
+    .update({ is_active: !!is_active })
+    .eq("company_id", company_id)
+    .eq("id", id);
+
+  if (error) throw error;
+  return true;
+}
+
+// products: bate com as tuas colunas (name, unit, product_type, cost, price, min_qty, is_active)
+async function listProducts(company_id, { include_inactive = false } = {}) {
+  let q = supabase
+    .from("products")
+    .select("id,code,name,unit,product_type,cost,price,min_qty,is_active,created_at")
+    .eq("company_id", company_id)
+    .order("created_at", { ascending: false });
+
+  if (!include_inactive) q = q.eq("is_active", true);
+
+  const { data, error } = await q;
+  if (error) throw error;
+  return data || [];
+}
+
+async function createProduct({ company_id, code, name, unit, product_type, cost, price, min_qty }) {
+  const payload = {
+    company_id,
+    code: (String(code || "").trim() || null),
+    name: String(name || "").trim(),
+    unit: (String(unit || "").trim() || "un"),
+    product_type: (String(product_type || "SIMPLE").trim() || "SIMPLE"),
+    cost: Number(cost || 0),
+    price: Number(price || 0),
+    min_qty: Number(min_qty || 0),
+    is_active: true
+  };
+
+  const { data, error } = await supabase
+    .from("products")
+    .insert([payload])
+    .select("id,code,name,unit,product_type,cost,price,min_qty,is_active,created_at")
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+async function setProductActive({ company_id, id, is_active }) {
+  const { error } = await supabase
+    .from("products")
+    .update({ is_active: !!is_active })
+    .eq("company_id", company_id)
+    .eq("id", id);
+  if (error) throw error;
+  return true;
+}
+    
     return {
       supabase: api.supabase,
       createCompanyWithAdmin: api.createCompanyWithAdmin,
@@ -560,6 +719,19 @@
       createClient,
       updateClient,
       setClientActive,
+
+        // cadastros
+  listBranches,
+  createBranch,
+  setBranchActive,
+
+  listWarehouses,
+  createWarehouse,
+  setWarehouseActive,
+
+  listProducts,
+  createProduct,
+  setProductActive
     };
   })();
 
@@ -1796,9 +1968,283 @@
         await load();
       };
 
-      return { initClientsScreen };
-    })();
+/* =========================
+   SETTINGS_UI (Cadastros)
+========================= */
+const SETTINGS_UI = (() => {
+  const bindOnce = DC_HELPERS.bindOnce;
 
+  const initSettingsScreen = async () => {
+    if (DC_STATE.state.ui.currentRoute !== "settings") return;
+
+    const company_id = DC_STATE.state.session.companyId;
+    if (!company_id) return;
+
+    const brBody = document.getElementById("setBrBody");
+    const whBody = document.getElementById("setWhBody");
+    const prBody = document.getElementById("setPrBody");
+
+    const brMsg  = document.getElementById("setBrMsg");
+    const whMsg  = document.getElementById("setWhMsg");
+    const prMsg  = document.getElementById("setPrMsg");
+
+    const brName = document.getElementById("setBranchName");
+    const whName = document.getElementById("setWhName");
+    const whBranch = document.getElementById("setWhBranch");
+
+    const prCode = document.getElementById("setPrCode");
+    const prName = document.getElementById("setPrName");
+    const prUnit = document.getElementById("setPrUnit");
+    const prType = document.getElementById("setPrType");
+    const prCost = document.getElementById("setPrCost");
+    const prPrice= document.getElementById("setPrPrice");
+    const prMin  = document.getElementById("setPrMin");
+
+    let branches = [];
+    let warehouses = [];
+    let products = [];
+
+    const loadBranches = async () => {
+      branches = await DC_DB.listBranches(company_id);
+      // preencher select do armazém
+      if (whBranch) {
+        whBranch.innerHTML =
+          branches
+            .filter(b => b.is_active !== false)
+            .map(b => `<option value="${b.id}">${b.name}</option>`)
+            .join("") || `<option value="">— Sem filiais —</option>`;
+      }
+
+      if (!brBody) return;
+      if (!branches.length) {
+        brBody.innerHTML = `<tr><td style="padding:10px" colspan="3" class="muted small">Sem filiais.</td></tr>`;
+        return;
+      }
+
+      brBody.innerHTML = branches.map(b => `
+        <tr>
+          <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);font-weight:900">${b.name || "—"}</td>
+          <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06)">${b.is_active ? "✅ Ativa" : "⛔ Inativa"}</td>
+          <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);text-align:right">
+            <button data-br-toggle="${b.id}" type="button"
+              style="padding:8px 10px;border-radius:10px;border:1px solid rgba(0,0,0,.12);font-weight:900;cursor:pointer">
+              ${b.is_active ? "Desativar" : "Ativar"}
+            </button>
+          </td>
+        </tr>
+      `).join("");
+
+      brBody.querySelectorAll("[data-br-toggle]").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const id = btn.getAttribute("data-br-toggle");
+          const row = branches.find(x => x.id === id);
+          if (!row) return;
+
+          try {
+            await DC_DB.setBranchActive({ company_id, id, is_active: !row.is_active });
+            await loadBranches();
+            await loadWarehouses(); // porque depende
+            DC_HELPERS.toast("Filial atualizada.", "ok");
+          } catch (e) {
+            DC_HELPERS.toast(e?.message || "Erro", "err");
+          }
+        });
+      });
+    };
+
+    const loadWarehouses = async () => {
+      warehouses = await DC_DB.listWarehouses(company_id);
+
+      if (!whBody) return;
+      if (!warehouses.length) {
+        whBody.innerHTML = `<tr><td style="padding:10px" colspan="4" class="muted small">Sem armazéns.</td></tr>`;
+        return;
+      }
+
+      const brMap = Object.fromEntries((branches || []).map(b => [b.id, b.name]));
+
+      whBody.innerHTML = warehouses.map(w => `
+        <tr>
+          <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);font-weight:900">${w.name || "—"}</td>
+          <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06)">${brMap[w.branch_id] || "—"}</td>
+          <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06)">${w.is_active ? "✅ Ativo" : "⛔ Inativo"}</td>
+          <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);text-align:right">
+            <button data-wh-toggle="${w.id}" type="button"
+              style="padding:8px 10px;border-radius:10px;border:1px solid rgba(0,0,0,.12);font-weight:900;cursor:pointer">
+              ${w.is_active ? "Desativar" : "Ativar"}
+            </button>
+          </td>
+        </tr>
+      `).join("");
+
+      whBody.querySelectorAll("[data-wh-toggle]").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const id = btn.getAttribute("data-wh-toggle");
+          const row = warehouses.find(x => x.id === id);
+          if (!row) return;
+
+          try {
+            await DC_DB.setWarehouseActive({ company_id, id, is_active: !row.is_active });
+            await loadWarehouses();
+            DC_HELPERS.toast("Armazém atualizado.", "ok");
+          } catch (e) {
+            DC_HELPERS.toast(e?.message || "Erro", "err");
+          }
+        });
+      });
+    };
+
+    const loadProducts = async () => {
+      products = await DC_DB.listProducts(company_id, { include_inactive: true });
+
+      if (!prBody) return;
+      if (!products.length) {
+        prBody.innerHTML = `<tr><td style="padding:10px" colspan="6" class="muted small">Sem produtos.</td></tr>`;
+        return;
+      }
+
+      const money = (n) => Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+      prBody.innerHTML = products.map(p => `
+        <tr>
+          <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);font-weight:900">${p.name || "—"}</td>
+          <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06)">${p.unit || "un"}</td>
+          <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06)">${p.product_type || "SIMPLE"}</td>
+          <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);text-align:right">${money(p.cost)}</td>
+          <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);text-align:right">${money(p.price)}</td>
+          <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);text-align:right">
+            <button data-pr-toggle="${p.id}" type="button"
+              style="padding:8px 10px;border-radius:10px;border:1px solid rgba(0,0,0,.12);font-weight:900;cursor:pointer">
+              ${p.is_active ? "Desativar" : "Ativar"}
+            </button>
+          </td>
+        </tr>
+      `).join("");
+
+      prBody.querySelectorAll("[data-pr-toggle]").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const id = btn.getAttribute("data-pr-toggle");
+          const row = products.find(x => x.id === id);
+          if (!row) return;
+
+          try {
+            await DC_DB.setProductActive({ company_id, id, is_active: !row.is_active });
+            await loadProducts();
+            DC_HELPERS.toast("Produto atualizado.", "ok");
+          } catch (e) {
+            DC_HELPERS.toast(e?.message || "Erro", "err");
+          }
+        });
+      });
+    };
+
+    // Binds 1x (Criar Filial)
+    bindOnce(document.getElementById("setBranchCreate"), "setBranchCreate", "click", async () => {
+      try {
+        if (brMsg) brMsg.textContent = "A guardar…";
+        const name = (brName?.value || "").trim();
+        if (!name) throw new Error("Nome da filial é obrigatório.");
+
+        await DC_DB.createBranch({ company_id, name });
+        if (brName) brName.value = "";
+
+        await loadBranches();
+        await loadWarehouses();
+        if (brMsg) brMsg.textContent = "";
+        DC_HELPERS.toast("Filial criada!", "ok");
+      } catch (e) {
+        if (brMsg) brMsg.textContent = "❌ " + (e?.message || e);
+        DC_HELPERS.toast(e?.message || "Erro", "err");
+      }
+    });
+
+    // Binds 1x (Criar Armazém)
+    bindOnce(document.getElementById("setWhCreate"), "setWhCreate", "click", async () => {
+      try {
+        if (whMsg) whMsg.textContent = "A guardar…";
+        const name = (whName?.value || "").trim();
+        const branch_id = whBranch?.value || null;
+        if (!branch_id) throw new Error("Crie/seleciona uma filial primeiro.");
+        if (!name) throw new Error("Nome do armazém é obrigatório.");
+
+        await DC_DB.createWarehouse({ company_id, branch_id, name });
+        if (whName) whName.value = "";
+
+        await loadWarehouses();
+        if (whMsg) whMsg.textContent = "";
+        DC_HELPERS.toast("Armazém criado!", "ok");
+      } catch (e) {
+        if (whMsg) whMsg.textContent = "❌ " + (e?.message || e);
+        DC_HELPERS.toast(e?.message || "Erro", "err");
+      }
+    });
+
+    // Binds 1x (Criar Produto)
+    bindOnce(document.getElementById("setPrCreate"), "setPrCreate", "click", async () => {
+      try {
+        if (prMsg) prMsg.textContent = "A guardar…";
+
+        const name = (prName?.value || "").trim();
+        if (!name) throw new Error("Nome do produto é obrigatório.");
+
+        await DC_DB.createProduct({
+          company_id,
+          code: (prCode?.value || "").trim(),
+          name,
+          unit: (prUnit?.value || "un").trim(),
+          product_type: (prType?.value || "SIMPLE").trim(),
+          cost: Number(prCost?.value || 0),
+          price: Number(prPrice?.value || 0),
+          min_qty: Number(prMin?.value || 0)
+        });
+
+        if (prCode) prCode.value = "";
+        if (prName) prName.value = "";
+        if (prCost) prCost.value = "0";
+        if (prPrice) prPrice.value = "0";
+        if (prMin) prMin.value = "0";
+
+        await loadProducts();
+        if (prMsg) prMsg.textContent = "";
+        DC_HELPERS.toast("Produto criado!", "ok");
+      } catch (e) {
+        if (prMsg) prMsg.textContent = "❌ " + (e?.message || e);
+        DC_HELPERS.toast(e?.message || "Erro", "err");
+      }
+    });
+
+    // carregar tudo
+    try {
+      if (brMsg) brMsg.textContent = "A carregar…";
+      await loadBranches();
+      if (brMsg) brMsg.textContent = "";
+    } catch (e) {
+      if (brMsg) brMsg.textContent = "❌ " + (e?.message || e);
+    }
+
+    try {
+      if (whMsg) whMsg.textContent = "A carregar…";
+      await loadWarehouses();
+      if (whMsg) whMsg.textContent = "";
+    } catch (e) {
+      if (whMsg) whMsg.textContent = "❌ " + (e?.message || e);
+    }
+
+    try {
+      if (prMsg) prMsg.textContent = "A carregar…";
+      await loadProducts();
+      if (prMsg) prMsg.textContent = "";
+    } catch (e) {
+      if (prMsg) prMsg.textContent = "❌ " + (e?.message || e);
+    }
+  };
+
+  return { initSettingsScreen };
+})();
+        return { initSettingsScreen };
+})();
+      
+ 
     /* =========================
        ROUTES (cards)
     ========================= */
@@ -2082,7 +2528,123 @@
   </div>
 `,
         suppliers: `<div class="card"><h2 class="subtitle">Fornecedores</h2><p class="muted">Compras e pagamentos.</p></div>`,
-        settings: `<div class="card"><h2 class="subtitle">Configurações</h2><p class="muted">Empresa e utilizadores.</p></div>`,
+      settings: `
+  <div class="card">
+    <h2 class="subtitle">Configurações</h2>
+    <p class="muted">Cadastros básicos para o sistema funcionar (Filial → Armazém → Produto).</p>
+    <div class="divider"></div>
+
+    <!-- FILIAIS -->
+    <div class="card" style="padding:12px">
+      <div class="subtitle subtitle--sm">Filiais (Branches)</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
+        <input id="setBranchName" placeholder="Nome da filial (ex: Principal)"
+          style="flex:1;min-width:220px;padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12)"/>
+        <button id="setBranchCreate" type="button"
+          style="padding:10px 12px;border-radius:12px;border:1px solid rgba(0,0,0,.12);font-weight:900;cursor:pointer">
+          + Criar Filial
+        </button>
+      </div>
+      <p id="setBrMsg" class="muted small" style="margin-top:8px"></p>
+
+      <div style="overflow:auto;margin-top:8px">
+        <table style="width:100%;border-collapse:collapse">
+          <thead>
+            <tr>
+              <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(0,0,0,.08)">Nome</th>
+              <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(0,0,0,.08)">Estado</th>
+              <th style="text-align:right;padding:10px;border-bottom:1px solid rgba(0,0,0,.08)"></th>
+            </tr>
+          </thead>
+          <tbody id="setBrBody">
+            <tr><td class="muted small" style="padding:10px" colspan="3">Carregando…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ARMAZÉNS -->
+    <div class="card" style="padding:12px;margin-top:12px">
+      <div class="subtitle subtitle--sm">Armazéns (Warehouses)</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
+        <select id="setWhBranch"
+          style="flex:1;min-width:220px;padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12)"></select>
+        <input id="setWhName" placeholder="Nome do armazém (ex: Armazém Principal)"
+          style="flex:2;min-width:240px;padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12)"/>
+        <button id="setWhCreate" type="button"
+          style="padding:10px 12px;border-radius:12px;border:1px solid rgba(0,0,0,.12);font-weight:900;cursor:pointer">
+          + Criar Armazém
+        </button>
+      </div>
+      <p id="setWhMsg" class="muted small" style="margin-top:8px"></p>
+
+      <div style="overflow:auto;margin-top:8px">
+        <table style="width:100%;border-collapse:collapse">
+          <thead>
+            <tr>
+              <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(0,0,0,.08)">Nome</th>
+              <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(0,0,0,.08)">Filial</th>
+              <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(0,0,0,.08)">Estado</th>
+              <th style="text-align:right;padding:10px;border-bottom:1px solid rgba(0,0,0,.08)"></th>
+            </tr>
+          </thead>
+          <tbody id="setWhBody">
+            <tr><td class="muted small" style="padding:10px" colspan="4">Carregando…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- PRODUTOS -->
+    <div class="card" style="padding:12px;margin-top:12px">
+      <div class="subtitle subtitle--sm">Produtos (Products)</div>
+
+      <div class="grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-top:10px">
+        <input id="setPrCode" placeholder="Código (opcional)"
+          style="padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12)"/>
+        <input id="setPrName" placeholder="Nome *"
+          style="padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12)"/>
+        <input id="setPrUnit" placeholder="Unidade (ex: un, kg)" value="un"
+          style="padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12)"/>
+        <select id="setPrType"
+          style="padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12)">
+          <option value="SIMPLE">SIMPLE</option>
+          <option value="BUNDLE">BUNDLE</option>
+        </select>
+        <input id="setPrCost" type="number" step="0.01" value="0" placeholder="Custo"
+          style="padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12)"/>
+        <input id="setPrPrice" type="number" step="0.01" value="0" placeholder="Preço"
+          style="padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12)"/>
+        <input id="setPrMin" type="number" step="0.001" value="0" placeholder="Mínimo"
+          style="padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12)"/>
+        <button id="setPrCreate" type="button"
+          style="padding:10px 12px;border-radius:12px;border:1px solid rgba(0,0,0,.12);font-weight:900;cursor:pointer">
+          + Criar Produto
+        </button>
+      </div>
+
+      <p id="setPrMsg" class="muted small" style="margin-top:8px"></p>
+
+      <div style="overflow:auto;margin-top:8px">
+        <table style="width:100%;border-collapse:collapse">
+          <thead>
+            <tr>
+              <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(0,0,0,.08)">Nome</th>
+              <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(0,0,0,.08)">Un</th>
+              <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(0,0,0,.08)">Tipo</th>
+              <th style="text-align:right;padding:10px;border-bottom:1px solid rgba(0,0,0,.08)">Custo</th>
+              <th style="text-align:right;padding:10px;border-bottom:1px solid rgba(0,0,0,.08)">Preço</th>
+              <th style="text-align:right;padding:10px;border-bottom:1px solid rgba(0,0,0,.08)"></th>
+            </tr>
+          </thead>
+          <tbody id="setPrBody">
+            <tr><td class="muted small" style="padding:10px" colspan="6">Carregando…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+`,
         bookings: `<div class="card"><h2 class="subtitle">Reservas</h2><p class="muted">Salas/estúdios/co-work.</p></div>`,
         patients: `<div class="card"><h2 class="subtitle">Pacientes</h2><p class="muted">Cadastro e histórico.</p></div>`,
         appointments: `<div class="card"><h2 class="subtitle">Agendamentos</h2><p class="muted">Consultas e agenda.</p></div>`,
@@ -2156,6 +2718,9 @@
         if (u.currentRoute === "sales") setTimeout(() => STOCK_UI.initSalesScreen(), 0);
         if (u.currentRoute === "stock") setTimeout(() => STOCK_UI.initStockScreen(), 0);
         if (u.currentRoute === "clients") setTimeout(() => CLIENTS_UI.initClientsScreen(), 0);
+        if (u.currentRoute === "settings") {
+  setTimeout(() => DC_UI.settings.initSettingsScreen(), 0);
+}
 
         // badge sempre atual
         STOCK_UI.refreshLowStockBadge();
@@ -2173,6 +2738,7 @@
 
       stock: STOCK_UI,
       clients: CLIENTS_UI,
+      settings: SETTINGS_UI
     };
   })();
 
@@ -2253,6 +2819,7 @@
           if (route === "stock") DC_UI.stock.initStockScreen();
           if (route === "sales") DC_UI.stock.initSalesScreen();
           if (route === "clients") DC_UI.clients.initClientsScreen();
+          if (route === "settings") DC_UI.settings.initSettingsScreen();
         });
       });
 
