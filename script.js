@@ -767,7 +767,7 @@ async function setProductActive({ company_id, id, is_active }) {
   setProductActive,
       listProductComponents,
 addProductComponent,
-removeProductComponent
+removeProductComponent,
     };
   })();
 
