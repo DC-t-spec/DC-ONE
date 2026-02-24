@@ -670,19 +670,10 @@ async function listProducts(company_id, { include_inactive = false } = {}) {
   return data || [];
 }
 
-async function createProduct({ company_id, code, name, unit, product_type, cost, price, min_qty }) {
-  const payload = {
-    company_id,
-    code: (String(code || "").trim() || null),
-    name: String(name || "").trim(),
-    unit: (String(unit || "").trim() || "un"),
-    product_type: (String(product_type || "SIMPLE").trim() || "SIMPLE"),
-    cost: Number(cost || 0),
-    price: Number(price || 0),
-    min_qty: Number(min_qty || 0),
-    is_active: true
-  };
-  async function listProductComponents(company_id, parent_product_id) {
+    // =====================
+// BOM / RECEITAS (product_components)
+// =====================
+async function listProductComponents(company_id, parent_product_id) {
   const { data, error } = await supabase
     .from("product_components")
     .select("id, component_product_id, qty, products!product_components_component_product_id_fkey(name, unit)")
@@ -721,17 +712,20 @@ async function removeProductComponent({ company_id, id }) {
   if (error) throw error;
   return true;
 }
-
-  const { data, error } = await supabase
-    .from("products")
-    .insert([payload])
-    .select("id,code,name,unit,product_type,cost,price,min_qty,is_active,created_at")
-    .single();
-
-  if (error) throw error;
-  return data;
-}
-
+    
+async function createProduct({ company_id, code, name, unit, product_type, cost, price, min_qty }) {
+  const payload = {
+    company_id,
+    code: (String(code || "").trim() || null),
+    name: String(name || "").trim(),
+    unit: (String(unit || "").trim() || "un"),
+    product_type: (String(product_type || "SIMPLE").trim() || "SIMPLE"),
+    cost: Number(cost || 0),
+    price: Number(price || 0),
+    min_qty: Number(min_qty || 0),
+    is_active: true
+  };
+ 
 async function setProductActive({ company_id, id, is_active }) {
   const { error } = await supabase
     .from("products")
