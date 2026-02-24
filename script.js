@@ -682,6 +682,45 @@ async function createProduct({ company_id, code, name, unit, product_type, cost,
     min_qty: Number(min_qty || 0),
     is_active: true
   };
+  async function listProductComponents(company_id, parent_product_id) {
+  const { data, error } = await supabase
+    .from("product_components")
+    .select("id, component_product_id, qty, products!product_components_component_product_id_fkey(name, unit)")
+    .eq("company_id", company_id)
+    .eq("parent_product_id", parent_product_id)
+    .order("created_at", { ascending: true });
+
+  if (error) throw error;
+  return data || [];
+}
+
+async function addProductComponent({ company_id, parent_product_id, component_product_id, qty }) {
+  const { data, error } = await supabase
+    .from("product_components")
+    .insert([{
+      company_id,
+      parent_product_id,
+      component_product_id,
+      qty: Number(qty),
+      created_by: DC_STATE.state.session.userId || null
+    }])
+    .select("id")
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+async function removeProductComponent({ company_id, id }) {
+  const { error } = await supabase
+    .from("product_components")
+    .delete()
+    .eq("company_id", company_id)
+    .eq("id", id);
+
+  if (error) throw error;
+  return true;
+}
 
   const { data, error } = await supabase
     .from("products")
@@ -731,7 +770,10 @@ async function setProductActive({ company_id, id, is_active }) {
 
   listProducts,
   createProduct,
-  setProductActive
+  setProductActive,
+      listProductComponents,
+addProductComponent,
+removeProductComponent
     };
   })();
 
@@ -2096,6 +2138,183 @@ const SETTINGS_UI = (() => {
       });
     };
 
+function openBomModal({ company_id, parent, allProducts }) {
+  const old = document.getElementById("dcBomModal");
+  if (old) old.remove();
+
+  const overlay = document.createElement("div");
+  overlay.id = "dcBomModal";
+  overlay.style.cssText = `
+    position:fixed;inset:0;background:rgba(0,0,0,.55);
+    display:flex;align-items:center;justify-content:center;
+    z-index:999999;padding:18px;
+  `;
+
+  const box = document.createElement("div");
+  box.style.cssText = `
+    width:min(760px, 100%); background:#fff; border-radius:18px;
+    padding:16px 16px 12px; box-shadow:0 20px 60px rgba(0,0,0,.25);
+    border:1px solid rgba(0,0,0,.08); max-height:84vh; overflow:auto;
+  `;
+
+  box.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+      <div style="font-weight:950;font-size:16px">🧩 Componentes do produto: ${parent?.name || "—"}</div>
+      <button id="dcBomClose" style="border:none;background:transparent;font-size:18px;font-weight:900;cursor:pointer">✕</button>
+    </div>
+
+    <p class="muted small" style="margin:8px 0 10px">
+      Define a receita: <b>o que 1 unidade</b> deste produto consome.
+      (Regra: só podes escolher componentes do tipo <b>SIMPLE</b>.)
+    </p>
+
+    <div class="divider" style="margin:10px 0"></div>
+
+    <div class="card" style="padding:12px">
+      <div class="subtitle subtitle--sm">Adicionar componente</div>
+
+      <div style="display:grid;grid-template-columns:1fr 160px 140px;gap:10px;margin-top:10px">
+        <select id="bomComponent"
+          style="padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12)"></select>
+
+        <input id="bomQty" type="number" step="0.001" min="0.001" value="1"
+          style="padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.12);text-align:right"/>
+
+        <button id="bomAdd" type="button"
+          style="padding:10px 12px;border-radius:12px;border:1px solid rgba(0,0,0,.12);font-weight:900;cursor:pointer">
+          + Adicionar
+        </button>
+      </div>
+
+      <p id="bomMsg" class="muted small" style="margin-top:10px"></p>
+    </div>
+
+    <div class="card" style="padding:12px;margin-top:12px">
+      <div class="subtitle subtitle--sm">Receita atual</div>
+      <div class="divider" style="margin:10px 0"></div>
+
+      <div style="overflow:auto">
+        <table style="width:100%;border-collapse:collapse">
+          <thead>
+            <tr>
+              <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(0,0,0,.08)">Componente</th>
+              <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(0,0,0,.08)">Un</th>
+              <th style="text-align:right;padding:10px;border-bottom:1px solid rgba(0,0,0,.08)">Qtd por 1</th>
+              <th style="text-align:right;padding:10px;border-bottom:1px solid rgba(0,0,0,.08)"></th>
+            </tr>
+          </thead>
+          <tbody id="bomBody">
+            <tr><td class="muted small" style="padding:10px" colspan="4">Carregando…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+
+  const close = () => overlay.remove();
+  document.getElementById("dcBomClose")?.addEventListener("click", close);
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
+
+  // preencher select com produtos SIMPLE ativos (sem permitir BUNDLE)
+  const sel = document.getElementById("bomComponent");
+  const simpleActive = (allProducts || [])
+    .filter(p => p.is_active !== false)
+    .filter(p => (p.product_type || "SIMPLE") === "SIMPLE")
+    .filter(p => p.id !== parent.id);
+
+  if (sel) {
+    sel.innerHTML = simpleActive.length
+      ? simpleActive.map(p => `<option value="${p.id}">${p.name} ${p.unit ? `(${p.unit})` : ""}</option>`).join("")
+      : `<option value="">— Sem produtos SIMPLE —</option>`;
+  }
+
+  const body = document.getElementById("bomBody");
+  const msg  = document.getElementById("bomMsg");
+
+  const render = async () => {
+    try {
+      if (msg) msg.textContent = "A carregar receita…";
+      const rows = await DC_DB.listProductComponents(company_id, parent.id);
+
+      if (!body) return;
+      if (!rows.length) {
+        body.innerHTML = `<tr><td class="muted small" style="padding:10px" colspan="4">Sem componentes.</td></tr>`;
+        if (msg) msg.textContent = "";
+        return;
+      }
+
+      const fmt = (n) => Number(n || 0).toLocaleString();
+
+      body.innerHTML = rows.map(r => {
+        const name = r.products?.name || "—";
+        const unit = r.products?.unit || "";
+        return `
+          <tr>
+            <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);font-weight:900">${name}</td>
+            <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06)">${unit || "—"}</td>
+            <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);text-align:right;font-weight:900">${fmt(r.qty)}</td>
+            <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);text-align:right">
+              <button data-bom-rm="${r.id}" type="button"
+                style="padding:8px 10px;border-radius:10px;border:1px solid rgba(0,0,0,.12);font-weight:900;cursor:pointer">
+                Remover
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join("");
+
+      body.querySelectorAll("[data-bom-rm]").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const id = btn.getAttribute("data-bom-rm");
+          try {
+            await DC_DB.removeProductComponent({ company_id, id });
+            DC_HELPERS.toast("Componente removido.", "info");
+            await render();
+          } catch (e) {
+            DC_HELPERS.toast(e?.message || "Erro", "err");
+          }
+        });
+      });
+
+      if (msg) msg.textContent = "";
+    } catch (e) {
+      if (msg) msg.textContent = "❌ " + (e?.message || e);
+      if (body) body.innerHTML = `<tr><td style="padding:10px" colspan="4">Erro.</td></tr>`;
+    }
+  };
+
+  document.getElementById("bomAdd")?.addEventListener("click", async () => {
+    try {
+      const component_product_id = document.getElementById("bomComponent")?.value;
+      const qty = Number(document.getElementById("bomQty")?.value || 0);
+
+      if (!component_product_id) throw new Error("Escolhe um componente.");
+      if (!(qty > 0)) throw new Error("Quantidade deve ser maior que 0.");
+
+      if (msg) msg.textContent = "A guardar…";
+
+      await DC_DB.addProductComponent({
+        company_id,
+        parent_product_id: parent.id,
+        component_product_id,
+        qty
+      });
+
+      if (msg) msg.textContent = "";
+      DC_HELPERS.toast("Componente adicionado!", "ok");
+      await render();
+    } catch (e) {
+      if (msg) msg.textContent = "❌ " + (e?.message || e);
+      DC_HELPERS.toast(e?.message || "Erro", "err");
+    }
+  });
+
+  render();
+}
+    
     const loadProducts = async () => {
       products = await DC_DB.listProducts(company_id, { include_inactive: true });
 
@@ -2115,11 +2334,19 @@ const SETTINGS_UI = (() => {
           <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);text-align:right">${money(p.cost)}</td>
           <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);text-align:right">${money(p.price)}</td>
           <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);text-align:right">
-            <button data-pr-toggle="${p.id}" type="button"
-              style="padding:8px 10px;border-radius:10px;border:1px solid rgba(0,0,0,.12);font-weight:900;cursor:pointer">
-              ${p.is_active ? "Desativar" : "Ativar"}
-            </button>
-          </td>
+           <td style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);text-align:right">
+  <button data-pr-toggle="${p.id}" type="button"
+    style="padding:8px 10px;border-radius:10px;border:1px solid rgba(0,0,0,.12);font-weight:900;cursor:pointer">
+    ${p.is_active ? "Desativar" : "Ativar"}
+  </button>
+
+  ${ (p.product_type || "SIMPLE") === "BUNDLE" ? `
+    <button data-pr-bom="${p.id}" type="button"
+      style="margin-left:8px;padding:8px 10px;border-radius:10px;border:1px solid rgba(0,0,0,.12);font-weight:900;cursor:pointer">
+      Componentes
+    </button>
+  ` : "" }
+</td>
         </tr>
       `).join("");
 
@@ -2138,6 +2365,16 @@ const SETTINGS_UI = (() => {
           }
         });
       });
+      prBody.querySelectorAll("[data-pr-bom]").forEach(btn => {
+  btn.addEventListener("click", async () => {
+    const parentId = btn.getAttribute("data-pr-bom");
+    const parent = products.find(x => x.id === parentId);
+    if (!parent) return;
+
+    // abre modal com a lista de produtos carregados (para preencher select)
+    openBomModal({ company_id, parent, allProducts: products });
+  });
+});
     };
 
     // Binds 1x (Criar Filial)
