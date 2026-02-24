@@ -1967,6 +1967,8 @@ async function setProductActive({ company_id, id, is_active }) {
 
         await load();
       };
+       return { initClientsScreen };
+})();
 
 /* =========================
    SETTINGS_UI (Cadastros)
@@ -2241,9 +2243,7 @@ const SETTINGS_UI = (() => {
 
   return { initSettingsScreen };
 })();
-        return { initSettingsScreen };
-})();
-      
+     
  
     /* =========================
        ROUTES (cards)
@@ -2718,10 +2718,7 @@ const SETTINGS_UI = (() => {
         if (u.currentRoute === "sales") setTimeout(() => STOCK_UI.initSalesScreen(), 0);
         if (u.currentRoute === "stock") setTimeout(() => STOCK_UI.initStockScreen(), 0);
         if (u.currentRoute === "clients") setTimeout(() => CLIENTS_UI.initClientsScreen(), 0);
-        if (u.currentRoute === "settings") {
-  setTimeout(() => DC_UI.settings.initSettingsScreen(), 0);
-}
-
+if (u.currentRoute === "settings") setTimeout(() => SETTINGS_UI.initSettingsScreen(), 0);
         // badge sempre atual
         STOCK_UI.refreshLowStockBadge();
       }
