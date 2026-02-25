@@ -723,15 +723,26 @@ async function createProduct({ company_id, code, name, unit, product_type, cost,
     cost: Number(cost || 0),
     price: Number(price || 0),
     min_qty: Number(min_qty || 0),
-    is_active: true
+    is_active: true,
   };
- 
+
+  const { data, error } = await supabase
+    .from("products")
+    .insert([payload])
+    .select("id,code,name,unit,product_type,cost,price,min_qty,is_active,created_at")
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
 async function setProductActive({ company_id, id, is_active }) {
   const { error } = await supabase
     .from("products")
     .update({ is_active: !!is_active })
     .eq("company_id", company_id)
     .eq("id", id);
+
   if (error) throw error;
   return true;
 }
