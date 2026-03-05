@@ -930,6 +930,17 @@ removeProductComponent,
   ========================= */
   const STOCK_LOGIC = (() => {
     const sb = () => DC_DB.supabase;
+    
+    async function dbg(label, fn) {
+  try {
+    const res = await fn();
+    console.log(`[${label}] OK`, res);
+    return res;
+  } catch (err) {
+    console.error(`[${label}] FAILED`, err);
+    throw err;
+  }
+}
 
     async function createStockOut({ company_id, branch_id, warehouse_id, product_id, qty, note }) {
       const { data: product, error } = await sb().from("products").select("id, product_type").eq("id", product_id).single();
@@ -938,17 +949,29 @@ removeProductComponent,
       const created_by = DC_STATE.state.session.userId || null;
 
       if (product.product_type === "SIMPLE") {
-        const { error: e2 } = await sb().from("stock_moves").insert({
-          company_id,
-          branch_id,
-          warehouse_id,
-          product_id,
-          move_type: "OUT",
-          qty,
-          ref_type: "manual",
-          ref_note: note || null,
-          created_by,
-        });
+        const payload = {
+  company_id,
+  branch_id,
+  warehouse_id,
+  product_id,
+  move_type: "OUT",
+  qty,
+  ref_type: "manual",
+  ref_note: note || null,
+  // created_by: created_by,   // <-- vamos tratar já abaixo
+};
+
+const { data, error, status } = await sb()
+  .from("stock_moves")
+  .insert(payload)
+  .select(); // força resposta detalhada
+
+console.log("STOCK_MOVES INSERT SIMPLE status:", status);
+console.log("STOCK_MOVES INSERT SIMPLE payload:", payload);
+console.log("STOCK_MOVES INSERT SIMPLE data:", data);
+console.log("STOCK_MOVES INSERT SIMPLE error:", error);
+
+if (error) throw error;
         if (e2) throw e2;
         return true;
       }
@@ -973,27 +996,45 @@ removeProductComponent,
         created_by,
       }));
 
-      const { error: e4 } = await sb().from("stock_moves").insert(moves);
-      if (e4) throw e4;
+    const { data, error, status } = await sb()
+  .from("stock_moves")
+  .insert(moves)
+  .select();
 
+console.log("STOCK_MOVES INSERT BUNDLE status:", status);
+console.log("STOCK_MOVES INSERT BUNDLE moves:", moves);
+console.log("STOCK_MOVES INSERT BUNDLE data:", data);
+console.log("STOCK_MOVES INSERT BUNDLE error:", error);
+
+if (error) throw error;
       return true;
     }
 
     async function createStockIn({ company_id, branch_id, warehouse_id, product_id, qty, note }) {
       const created_by = DC_STATE.state.session.userId || null;
 
-      const { error } = await sb().from("stock_moves").insert({
-        company_id,
-        branch_id,
-        warehouse_id,
-        product_id,
-        move_type: "IN",
-        qty,
-        ref_type: "manual",
-        ref_note: note || null,
-        created_by,
-      });
-      if (error) throw error;
+    const payload = {
+  company_id,
+  branch_id,
+  warehouse_id,
+  product_id,
+  move_type: "IN",
+  qty,
+  ref_type: "manual",
+  ref_note: note || null,
+};
+
+const { data, error, status } = await sb()
+  .from("stock_moves")
+  .insert(payload)
+  .select();
+
+console.log("STOCK_MOVES INSERT IN status:", status);
+console.log("STOCK_MOVES INSERT IN payload:", payload);
+console.log("STOCK_MOVES INSERT IN data:", data);
+console.log("STOCK_MOVES INSERT IN error:", error);
+
+if (error) throw error;
 
       return true;
     }
