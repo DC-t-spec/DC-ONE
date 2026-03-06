@@ -387,20 +387,18 @@
         return data;
       },
 
-      async createSale({ company_id, branch_id, warehouse_id, items, ref_note }) {
-        const created_by = DC_STATE.state.session.userId || null;
-
-        const { data, error } = await supabase.rpc("dc_create_sale", {
-          p_company_id: company_id,
-          p_branch_id: branch_id,
-          p_warehouse_id: warehouse_id,
-          p_items: items,
-          p_ref_note: ref_note ?? null,
-          p_created_by: created_by,
-        });
-        if (error) throw error;
-        return data; // sale_id
-      },
+async createSale({ company_id, branch_id, warehouse_id, items, ref_note }) {
+  const { data, error } = await supabase.rpc("dc_create_sale", {
+    p_company_id: company_id,
+    p_branch_id: branch_id,
+    p_warehouse_id: warehouse_id,
+    p_items: items,
+    p_ref_note: ref_note ?? null,
+    p_created_by: null,
+  });
+  if (error) throw error;
+  return data;
+}
 
       async listCashAccounts(company_id) {
         const { data, error } = await supabase
