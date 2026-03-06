@@ -945,6 +945,14 @@ removeProductComponent,
 }
 
     async function createStockOut({ company_id, branch_id, warehouse_id, product_id, qty, note }) {
+      console.log("📦 company_id:", company_id);
+
+const { data: u, error: ue } = await sb().auth.getUser();
+console.log("✅ AUTH user:", u?.user?.id, u?.user?.email);
+console.log("AUTH getUser error:", ue);
+
+const { data: s } = await sb().auth.getSession();
+console.log("✅ SESSION user:", s?.session?.user?.id);
       const { data: product, error } = await sb().from("products").select("id, product_type").eq("id", product_id).single();
       if (error) throw error;
 
