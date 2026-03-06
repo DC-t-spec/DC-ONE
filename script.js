@@ -8,8 +8,6 @@
     SUPABASE_URL: "https://jnovwijxuplrcjbtnerc.supabase.co",
     SUPABASE_ANON_KEY:
       "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impub3Z3aWp4dXBscmNqYnRuZXJjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA5MTI0MjcsImV4cCI6MjA4NjQ4ODQyN30.99oSvJ94iq4IfukLQTCFi5DvdAPbooDV4Ll9KgAuGD0",
-
-    console.log("✅ SUPABASE_URL (app):", DC_CONFIG.SUPABASE_URL);
   
     AUTH_EMAIL_DOMAIN: "dc",
     PLANS: ["basic", "pro", "inteligente"],
@@ -40,6 +38,7 @@
       Agricultura: ["dashboard", "production", "stock", "sales", "cash", "reports", "settings"],
     },
   };
+    console.log("✅ SUPABASE_URL (app):", DC_CONFIG.SUPABASE_URL);
 
   /* =======================
      2) STATE / DB (STATE)
@@ -982,7 +981,7 @@ console.log("STOCK_MOVES INSERT SIMPLE data:", data);
 console.log("STOCK_MOVES INSERT SIMPLE error:", error);
 
 if (error) throw error;
-        if (e2) throw e2;
+        
         return true;
       }
 
@@ -1003,7 +1002,7 @@ if (error) throw error;
         qty: Number(qty) * Number(c.qty),
         ref_type: "bundle_expand",
         ref_note: note || "Saída via kit",
-        created_by,
+        
       }));
 
     const { data, error, status } = await sb()
