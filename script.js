@@ -694,7 +694,7 @@ async function addProductComponent({ company_id, parent_product_id, component_pr
       parent_product_id,
       component_product_id,
       qty: Number(qty),
-      created_by: DC_STATE.state.session.userId || null
+     
     }])
     .select("id")
     .single();
@@ -952,7 +952,7 @@ console.log("AUTH getUser error:", ue);
 
 const { data: s } = await sb().auth.getSession();
 console.log("✅ SESSION user:", s?.session?.user?.id);
-      const { data: product, error } = await sb().from("products").select("id, product_type").eq("id", product_id).single();
+      const { data: product, error: errProd } = await sb().from("products").select("id, product_type").eq("id", product_id).single();
       if (error) throw error;
 
       const created_by = DC_STATE.state.session.userId || null;
@@ -970,10 +970,10 @@ console.log("✅ SESSION user:", s?.session?.user?.id);
   // created_by: created_by,   // <-- vamos tratar já abaixo
 };
 
-const { data, error, status } = await sb()
+const { data: insSimple, error: errSimple, status: stSimple } = await sb()
   .from("stock_moves")
   .insert(payload)
-  .select(); // força resposta detalhada
+  .select();
 
 console.log("STOCK_MOVES INSERT SIMPLE status:", status);
 console.log("STOCK_MOVES INSERT SIMPLE payload:", payload);
@@ -1005,7 +1005,7 @@ if (error) throw error;
         
       }));
 
-    const { data, error, status } = await sb()
+   const { data: insRows, error: errBundle, status: stBundle } = await sb()
   .from("stock_moves")
   .insert(moves)
   .select();
